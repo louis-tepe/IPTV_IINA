@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0">
+  <objects>
+    <customObject id="-2" userLabel="File's Owner"/>
+    <customObject id="-1" userLabel="First Responder"/>
+    <customView id="1">
+      <rect key="frame" x="0" y="0" width="450" height="300"/>
+      <subviews>
+        <!-- Server URL -->
+        <textField id="serverLabel">
+          <rect key="frame" x="20" y="250" width="100" height="22"/>
+          <textFieldCell id="serverLabelCell" title="Server URL:" alignment="right"/>
+        </textField>
+        <textField id="serverField">
+          <rect key="frame" x="130" y="250" width="300" height="22"/>
+          <textFieldCell id="serverFieldCell" placeholderString="http://example.com:8080"/>
+          <connections>
+            <binding destination="-2" name="value" keyPath="preferences.server"/>
+          </connections>
+        </textField>
+        
+        <!-- Username -->
+        <textField id="usernameLabel">
+          <rect key="frame" x="20" y="210" width="100" height="22"/>
+          <textFieldCell id="usernameLabelCell" title="Username:" alignment="right"/>
+        </textField>
+        <textField id="usernameField">
+          <rect key="frame" x="130" y="210" width="300" height="22"/>
+          <textFieldCell id="usernameFieldCell" placeholderString="Your username"/>
+          <connections>
+            <binding destination="-2" name="value" keyPath="preferences.username"/>
+          </connections>
+        </textField>
+        
+        <!-- Password -->
+        <textField id="passwordLabel">
+          <rect key="frame" x="20" y="170" width="100" height="22"/>
+          <textFieldCell id="passwordLabelCell" title="Password:" alignment="right"/>
+        </textField>
+        <secureTextField id="passwordField">
+          <rect key="frame" x="130" y="170" width="300" height="22"/>
+          <secureTextFieldCell id="passwordFieldCell" placeholderString="Your password"/>
+          <connections>
+            <binding destination="-2" name="value" keyPath="preferences.password"/>
+          </connections>
+        </secureTextField>
+        
+        <!-- Name -->
+        <textField id="nameLabel">
+          <rect key="frame" x="20" y="130" width="100" height="22"/>
+          <textFieldCell id="nameLabelCell" title="Name:" alignment="right"/>
+        </textField>
+        <textField id="nameField">
+          <rect key="frame" x="130" y="130" width="300" height="22"/>
+          <textFieldCell id="nameFieldCell" placeholderString="My IPTV (optional)"/>
+          <connections>
+            <binding destination="-2" name="value" keyPath="preferences.name"/>
+          </connections>
+        </textField>
+        
+        <!-- Separator -->
+        <box id="separator">
+          <rect key="frame" x="20" y="100" width="410" height="5"/>
+          <boxType key="boxType" separator="YES"/>
+        </box>
+        
+        <!-- Info text -->
+        <textField id="infoText">
+          <rect key="frame" x="20" y="60" width="410" height="34"/>
+          <textFieldCell id="infoTextCell">
+            <attributedString key="attributedStringValue">
+              <fragment content="Enter your IPTV provider credentials. These support the Xtream Codes API format commonly used by IPTV services."/>
+            </attributedString>
+          </textFieldCell>
+        </textField>
+      </subviews>
+    </customView>
+  </objects>
+</document>
