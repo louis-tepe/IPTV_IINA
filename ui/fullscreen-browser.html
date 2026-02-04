@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IPTV Browser</title>
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a24;
+      --bg-hover: #252532;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0b0;
+      --accent: #e50914;
+      --accent-hover: #ff1a1a;
+      --border: rgba(255,255,255,0.1);
+      --shadow: 0 8px 32px rgba(0,0,0,0.4);
+      --radius: 8px;
+      --transition: all 0.3s ease;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    
+    /* Header */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: linear-gradient(180deg, var(--bg-primary) 0%, transparent 100%);
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 14px;
+    }
+    
+    .back-btn:hover {
+      background: var(--bg-hover);
+    }
+    
+    .back-btn.hidden {
+      display: none;
+    }
+    
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    
+    .logo-text {
+      font-size: 24px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff 0%, #aaa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    /* Navigation Tabs */
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      padding: 0 40px;
+      margin-bottom: 30px;
+    }
+    
+    .nav-tab {
+      padding: 12px 24px;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 24px;
+      transition: var(--transition);
+    }
+    
+    .nav-tab:hover {
+      color: var(--text-primary);
+      background: var(--bg-card);
+    }
+    
+    .nav-tab.active {
+      background: var(--accent);
+      color: white;
+    }
+    
+    /* Content */
+    .content {
+      padding: 0 40px 40px;
+    }
+    
+    .section-title {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .section-title .count {
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+    
+    /* Category Row */
+    .category-row {
+      margin-bottom: 40px;
+    }
+    
+    .category-row-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    
+    .category-row-title {
+      font-size: 20px;
+      font-weight: 600;
+    }
+    
+    .category-row-scroll {
+      display: flex;
+      gap: 16px;
+      overflow-x: auto;
+      padding-bottom: 10px;
+      scroll-behavior: smooth;
+    }
+    
+    .category-row-scroll::-webkit-scrollbar {
+      height: 6px;
+    }
+    
+    .category-row-scroll::-webkit-scrollbar-track {
+      background: var(--bg-secondary);
+      border-radius: 3px;
+    }
+    
+    .category-row-scroll::-webkit-scrollbar-thumb {
+      background: var(--bg-hover);
+      border-radius: 3px;
+    }
+    
+    /* Cards Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 20px;
+    }
+    
+    /* Card */
+    .card {
+      background: var(--bg-card);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: var(--transition);
+      position: relative;
+    }
+    
+    .card:hover {
+      transform: translateY(-8px) scale(1.02);
+      box-shadow: var(--shadow);
+    }
+    
+    .card-poster {
+      aspect-ratio: 2/3;
+      background: var(--bg-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    
+    .card-poster img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .card-poster .placeholder {
+      font-size: 48px;
+      opacity: 0.3;
+    }
+    
+    .card-info {
+      padding: 12px;
+    }
+    
+    .card-title {
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .card-meta {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    
+    .card-play {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      width: 60px;
+      height: 60px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: var(--transition);
+    }
+    
+    .card:hover .card-play {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+    
+    .card-play svg {
+      width: 24px;
+      height: 24px;
+      fill: white;
+      margin-left: 4px;
+    }
+    
+    /* Category Card */
+    .category-card {
+      min-width: 200px;
+      flex-shrink: 0;
+      background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
+      border-radius: 12px;
+      padding: 24px;
+      cursor: pointer;
+      transition: var(--transition);
+      border: 1px solid var(--border);
+    }
+    
+    .category-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+      box-shadow: 0 8px 24px rgba(229, 9, 20, 0.2);
+    }
+    
+    .category-card-icon {
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+    
+    .category-card-name {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    
+    /* Loading */
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 40px;
+      gap: 20px;
+    }
+    
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid var(--bg-hover);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      color: var(--text-secondary);
+      font-size: 16px;
+    }
+    
+    /* Empty State */
+    .empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 40px;
+      text-align: center;
+    }
+    
+    .empty-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      opacity: 0.5;
+    }
+    
+    .empty-text {
+      color: var(--text-secondary);
+      font-size: 16px;
+    }
+    
+    /* Scrollable Card Row */
+    .scroll-row {
+      display: flex;
+      gap: 16px;
+      overflow-x: auto;
+      padding-bottom: 10px;
+    }
+    
+    .scroll-row .card {
+      flex: 0 0 180px;
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <button id="back-btn" class="back-btn hidden">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Retour
+      </button>
+      <div class="logo">
+        <div class="logo-icon">TV</div>
+        <span class="logo-text">IPTV Browser</span>
+      </div>
+    </div>
+  </header>
+
+  <nav class="nav-tabs">
+    <button class="nav-tab active" data-type="live">📺 Live TV</button>
+    <button class="nav-tab" data-type="vod">🎬 Films</button>
+    <button class="nav-tab" data-type="series">📚 Séries</button>
+  </nav>
+
+  <main class="content">
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <div class="loading-text">Chargement...</div>
+    </div>
+    
+    <div id="empty" class="empty hidden">
+      <div class="empty-icon">📭</div>
+      <div class="empty-text" id="empty-message">Aucun contenu</div>
+    </div>
+    
+    <div id="categories-view">
+      <div class="section-title">
+        Catégories <span id="category-count" class="count"></span>
+      </div>
+      <div id="categories-grid" class="cards-grid"></div>
+    </div>
+    
+    <div id="streams-view" class="hidden">
+      <div class="section-title" id="streams-title">Streams</div>
+      <div id="streams-grid" class="cards-grid"></div>
+    </div>
+  </main>
+
+  <script>
+    (function() {
+      'use strict';
+      
+      // State
+      var currentType = 'live';
+      var isShowingStreams = false;
+      var currentCategoryName = '';
+      var config = null;
+      
+      // DOM
+      var backBtn = document.getElementById('back-btn');
+      var loadingEl = document.getElementById('loading');
+      var emptyEl = document.getElementById('empty');
+      var emptyMsg = document.getElementById('empty-message');
+      var categoriesView = document.getElementById('categories-view');
+      var categoriesGrid = document.getElementById('categories-grid');
+      var categoryCount = document.getElementById('category-count');
+      var streamsView = document.getElementById('streams-view');
+      var streamsGrid = document.getElementById('streams-grid');
+      var streamsTitle = document.getElementById('streams-title');
+      var tabs = document.querySelectorAll('.nav-tab');
+      
+      function log(msg) {
+        console.log('[FullBrowser] ' + msg);
+      }
+      
+      function showLoading() {
+        loadingEl.classList.remove('hidden');
+        emptyEl.classList.add('hidden');
+        categoriesView.classList.add('hidden');
+        streamsView.classList.add('hidden');
+      }
+      
+      function hideLoading() {
+        loadingEl.classList.add('hidden');
+      }
+      
+      function showEmpty(msg) {
+        hideLoading();
+        emptyEl.classList.remove('hidden');
+        emptyMsg.textContent = msg || 'Aucun contenu trouvé';
+        categoriesView.classList.add('hidden');
+        streamsView.classList.add('hidden');
+      }
+      
+      function showCategories() {
+        isShowingStreams = false;
+        backBtn.classList.add('hidden');
+        categoriesView.classList.remove('hidden');
+        streamsView.classList.add('hidden');
+      }
+      
+      function showStreams(categoryName) {
+        isShowingStreams = true;
+        currentCategoryName = categoryName;
+        backBtn.classList.remove('hidden');
+        categoriesView.classList.add('hidden');
+        streamsView.classList.remove('hidden');
+        streamsTitle.textContent = categoryName;
+      }
+      
+      function getIcon(type) {
+        return type === 'live' ? '📺' : type === 'vod' ? '🎬' : '📚';
+      }
+      
+      function renderCategories(data) {
+        hideLoading();
+        showCategories();
+        
+        if (!data || data.length === 0) {
+          showEmpty('Aucune catégorie trouvée');
+          return;
+        }
+        
+        categoryCount.textContent = '(' + data.length + ')';
+        
+        categoriesGrid.innerHTML = data.map(function(cat) {
+          var name = cat.category_name || cat.name || 'Inconnu';
+          var id = cat.category_id || cat.id;
+          return '<div class="category-card" data-id="' + id + '" data-name="' + name.replace(/"/g, '&quot;') + '">' +
+            '<div class="category-card-icon">' + getIcon(currentType) + '</div>' +
+            '<div class="category-card-name">' + name + '</div>' +
+          '</div>';
+        }).join('');
+        
+        categoriesGrid.querySelectorAll('.category-card').forEach(function(el) {
+          el.addEventListener('click', function() {
+            var id = el.getAttribute('data-id');
+            var name = el.getAttribute('data-name');
+            loadStreams(id, name);
+          });
+        });
+        
+        log('Rendered ' + data.length + ' categories');
+      }
+      
+      function renderStreams(data, categoryName) {
+        hideLoading();
+        showStreams(categoryName);
+        
+        if (!data || data.length === 0) {
+          showEmpty('Aucun contenu dans cette catégorie');
+          return;
+        }
+        
+        streamsGrid.innerHTML = data.map(function(stream) {
+          var name = stream.name || 'Inconnu';
+          var id = stream.stream_id || stream.series_id || stream.id;
+          var poster = stream.stream_icon || stream.cover || '';
+          var year = stream.year || '';
+          var rating = stream.rating || '';
+          
+          var posterHtml = poster 
+            ? '<img src="' + poster + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=placeholder>' + getIcon(currentType) + '</div>\'">'
+            : '<div class="placeholder">' + getIcon(currentType) + '</div>';
+          
+          var metaHtml = '';
+          if (year) metaHtml += year;
+          if (rating) metaHtml += (metaHtml ? ' • ' : '') + '⭐ ' + rating;
+          
+          return '<div class="card" data-id="' + id + '" data-name="' + name.replace(/"/g, '&quot;') + '">' +
+            '<div class="card-poster">' + posterHtml + '</div>' +
+            '<div class="card-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>' +
+            '<div class="card-info">' +
+              '<div class="card-title">' + name + '</div>' +
+              (metaHtml ? '<div class="card-meta">' + metaHtml + '</div>' : '') +
+            '</div>' +
+          '</div>';
+        }).join('');
+        
+        streamsGrid.querySelectorAll('.card').forEach(function(el) {
+          el.addEventListener('click', function() {
+            var id = el.getAttribute('data-id');
+            var name = el.getAttribute('data-name');
+            playStream(id, name);
+          });
+        });
+        
+        log('Rendered ' + data.length + ' streams');
+      }
+      
+      function loadCategories() {
+        showLoading();
+        log('Requesting ' + currentType + ' categories');
+        
+        if (typeof iina !== 'undefined' && iina.postMessage) {
+          iina.postMessage('browser_getCategories', { type: currentType });
+        } else {
+          showEmpty('Plugin non connecté');
+        }
+      }
+      
+      function loadStreams(categoryId, categoryName) {
+        showLoading();
+        log('Requesting streams for: ' + categoryName);
+        
+        if (typeof iina !== 'undefined' && iina.postMessage) {
+          iina.postMessage('browser_getStreams', {
+            type: currentType,
+            categoryId: categoryId,
+            categoryName: categoryName
+          });
+        }
+      }
+      
+      function playStream(id, name) {
+        log('Playing: ' + name);
+        
+        if (typeof iina !== 'undefined' && iina.postMessage) {
+          iina.postMessage('browser_play', {
+            id: id,
+            name: name,
+            type: currentType
+          });
+        }
+      }
+      
+      // Event Handlers
+      backBtn.addEventListener('click', function() {
+        loadCategories();
+      });
+      
+      tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          tabs.forEach(function(t) { t.classList.remove('active'); });
+          tab.classList.add('active');
+          currentType = tab.getAttribute('data-type');
+          loadCategories();
+        });
+      });
+      
+      // Message Handlers
+      if (typeof iina !== 'undefined' && iina.onMessage) {
+        iina.onMessage('browser_categories', function(data) {
+          log('Received categories: ' + (data ? data.length : 0));
+          renderCategories(data);
+        });
+        
+        iina.onMessage('browser_streams', function(data) {
+          log('Received streams');
+          renderStreams(data.streams, data.categoryName);
+        });
+        
+        iina.onMessage('browser_init', function(data) {
+          log('Init received');
+          config = data;
+          if (data && data.configured) {
+            loadCategories();
+          } else {
+            showEmpty('Veuillez configurer votre serveur IPTV');
+          }
+        });
+        
+        iina.onMessage('browser_error', function(data) {
+          log('Error: ' + (data ? data.message : 'Unknown'));
+          showEmpty(data ? data.message : 'Une erreur est survenue');
+        });
+        
+        // HTTP Proxy Handler
+        iina.onMessage('api_request', function(data) {
+          log('API request: ' + data.requestId);
+          
+          fetch(data.url, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+          })
+          .then(function(res) {
+            return res.text().then(function(text) {
+              return { statusCode: res.status, text: text };
+            });
+          })
+          .then(function(result) {
+            iina.postMessage('api_response', {
+              requestId: data.requestId,
+              success: true,
+              statusCode: result.statusCode,
+              text: result.text
+            });
+          })
+          .catch(function(err) {
+            iina.postMessage('api_response', {
+              requestId: data.requestId,
+              success: false,
+              error: err.message
+            });
+          });
+        });
+      }
+      
+      // Initialize
+      document.addEventListener('DOMContentLoaded', function() {
+        log('Window loaded, sending ready signal');
+        if (typeof iina !== 'undefined' && iina.postMessage) {
+          iina.postMessage('browser_ready', {});
+        }
+      });
+      
+      if (document.readyState !== 'loading') {
+        log('Document ready');
+        if (typeof iina !== 'undefined' && iina.postMessage) {
+          iina.postMessage('browser_ready', {});
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

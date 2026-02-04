@@ -1,23 +1,30 @@
 {
   "name": "IPTV Player (Enhanced)",
   "identifier": "com.iptv.iina-plugin",
-  "version": "8.0.0",
-  "description": "IPTV Player v8.0.0 - Modernized Architecture: Centralized Logger, i18n (FR/EN), Simplified build (no wrappers), Native iina.http API, Streamlined EPG, Enhanced state management, CSS cleanup (53% reduction), Virtual scrolling, Lazy loading, Request deduplication, Complete Resume/History, EPG, Favorites, Search. 100% portable with iina.preferences storage.",
+  "version": "8.0.3",
+  "description": "IPTV Player with catalog browser for movies, series, and live channels.",
   "author": {
     "name": "IPTV Plugin Developer"
   },
-  "globalEntry": "dist/global.js",
-  "entry": "dist/main.js",
+  "globalEntry": "global.js",
+  "entry": "main.js",
   "permissions": [
-    "network-request",
     "file-system",
-    "show-overlay",
-    "show-alert",
-    "menu",
-    "preferences",
-    "playlist",
-    "standalone-window"
+    "network-request",
+    "show-osd",
+    "show-alert"
   ],
   "allowedDomains": ["*"],
-  "minIINAVersion": "1.0.0"
+  "minIINAVersion": "1.4.1",
+  "sidebarTab": {
+    "name": "IPTV Browser"
+  },
+  "preferencesPage": "ui/connection.html",
+  "preferenceDefaults": {
+    "iptv_config": "",
+    "iptv_play_request": "",
+    "iptv_open_browser": "",
+    "iptv_debug": false,
+    "iptv_locale": "fr"
+  }
 }

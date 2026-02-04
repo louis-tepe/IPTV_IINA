@@ -74,6 +74,138 @@ function playEpisodeSimple(streamId, ext, title, seriesId) {
 window.playEpisodeSimple = playEpisodeSimple;
 
 // ============================================
+// MOVIE DETAILS MODAL
+// ============================================
+
+let currentModalData = null;
+
+/**
+ * Format duration from minutes to readable format
+ * @param {number} minutes - Duration in minutes
+ * @returns {string}
+ */
+function formatDuration(minutes) {
+  if (!minutes || isNaN(minutes)) return '';
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hrs > 0) {
+    return `${hrs}h ${mins}m`;
+  }
+  return `${mins}m`;
+}
+
+/**
+ * Show movie details modal
+ * @param {Object} item - Movie data
+ */
+function showMovieModal(item) {
+  const modal = document.getElementById('movie-modal');
+  if (!modal) return;
+  
+  currentModalData = item;
+  
+  const header = document.getElementById('movie-modal-header');
+  const title = document.getElementById('movie-modal-title');
+  const meta = document.getElementById('movie-modal-meta');
+  const synopsis = document.getElementById('movie-modal-synopsis');
+  
+  // Set backdrop
+  const backdrop = item.backdrop_path || item.stream_icon || item.cover || '';
+  if (header) {
+    header.style.backgroundImage = backdrop ? `url('${backdrop}')` : 'none';
+  }
+  
+  // Set title
+  if (title) title.textContent = item.name || item.title || 'Unknown';
+  
+  // Build meta badges
+  let metaHtml = '';
+  if (item.rating) {
+    metaHtml += `<span class="movie-modal-badge rating">★ ${item.rating}</span>`;
+  }
+  if (item.releaseDate || item.year) {
+    const year = item.year || (item.releaseDate ? item.releaseDate.split('-')[0] : '');
+    if (year) metaHtml += `<span class="movie-modal-badge">${year}</span>`;
+  }
+  if (item.duration) {
+    metaHtml += `<span class="movie-modal-badge">${formatDuration(item.duration)}</span>`;
+  }
+  if (item.genre) {
+    metaHtml += `<span class="movie-modal-badge">${item.genre}</span>`;
+  }
+  if (meta) meta.innerHTML = metaHtml;
+  
+  // Set synopsis
+  if (synopsis) {
+    synopsis.textContent = item.plot || item.description || item.synopsis || 'No description available.';
+  }
+  
+  // Show modal
+  modal.hidden = false;
+  modal.classList.add('active');
+  
+  // Announce to screen readers
+  const liveRegion = document.getElementById('live-region');
+  if (liveRegion) {
+    liveRegion.textContent = `Opened details for ${item.name || 'movie'}`;
+  }
+}
+
+/**
+ * Close movie modal
+ */
+function closeMovieModal() {
+  const modal = document.getElementById('movie-modal');
+  if (modal) {
+    modal.classList.remove('active');
+    setTimeout(() => { modal.hidden = true; }, 300);
+  }
+  currentModalData = null;
+}
+
+/**
+ * Play from modal
+ */
+function playFromModal() {
+  if (!currentModalData) return;
+  const id = currentModalData.stream_id || currentModalData.id;
+  const ext = currentModalData.container_extension || 'mp4';
+  const name = currentModalData.name || currentModalData.title || 'Unknown';
+  playStream(id, ext, name, 'vod');
+  closeMovieModal();
+}
+
+// Setup modal event listeners
+document.addEventListener('DOMContentLoaded', () => {
+  const closeBtn = document.getElementById('movie-modal-close');
+  const playBtn = document.getElementById('movie-modal-play');
+  const overlay = document.getElementById('movie-modal');
+  
+  if (closeBtn) closeBtn.addEventListener('click', closeMovieModal);
+  if (playBtn) playBtn.addEventListener('click', playFromModal);
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeMovieModal();
+    });
+  }
+  
+  // Escape key closes modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeMovieModal();
+  });
+  
+  // Detect keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      document.body.classList.add('keyboard-nav');
+    }
+  });
+  document.addEventListener('mousedown', () => {
+    document.body.classList.remove('keyboard-nav');
+  });
+});
+
+// ============================================
 // LOADING & UI STATE
 // ============================================
 
@@ -258,22 +390,27 @@ function createStreamCard(item, type, index) {
     </div>
   `;
   
-  // Click to play
+  // Click handler
   card.addEventListener('click', (e) => {
     if (e.target.closest('.stream-favorite') || e.target.closest('.stream-epg-btn')) return;
     
     if (searchType === 'series') {
       loadSeriesInfo(id, name);
+    } else if (searchType === 'vod') {
+      // Show modal for VOD
+      showMovieModal(item);
     } else {
       playStream(id, ext, name, searchType);
     }
   });
   
-  // Favorite toggle
   const favBtn = card.querySelector('.stream-favorite');
   if (favBtn) {
     favBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      // Add animation
+      favBtn.classList.add('animating');
+      setTimeout(() => favBtn.classList.remove('animating'), 400);
       toggleFavorite(id, name, searchType, favBtn);
     });
   }
@@ -1003,31 +1140,45 @@ function setupEventListeners() {
  * Initialize browser
  */
 function init() {
-  // Cache elements
-  Object.assign(elements, cacheElements());
-  
-  setupEventListeners();
-  setupDebugPanelListeners(
-    elements.debugClear,
-    elements.debugToggle,
-    elements.debugPanel,
-    elements.debugLogs,
-    elements.debugMsgCount
-  );
-  setupMessageHandlers();
-  
-  if (elements.debugPanel) {
-    elements.debugPanel.hidden = !state.debugVisible;
+  try {
+    // Cache elements
+    Object.assign(elements, cacheElements());
+    
+    setupEventListeners();
+    setupDebugPanelListeners(
+      elements.debugClear,
+      elements.debugToggle,
+      elements.debugPanel,
+      elements.debugLogs,
+      elements.debugMsgCount
+    );
+    setupMessageHandlers();
+    
+    if (elements.debugPanel) {
+      elements.debugPanel.hidden = !state.debugVisible;
+    }
+    
+    if (DEBUG) {
+      debug('Browser initialization starting...', 'info');
+    }
+    
+    sendMessage('ready');
+    
+    loadContent('live');
+  } catch (e) {
+    debug('Initialization error: ' + e.message, 'error');
+    // Display error visually
+    if (elements.list) {
+      elements.list.innerHTML = '<div style="color:red;padding:20px;">Error: ' + escapeHtml(e.message) + '</div>';
+    }
   }
-  
-  if (DEBUG) {
-    debug('Browser initialization starting...', 'info');
-  }
-  
-  sendMessage('ready');
-  
-  loadContent('live');
 }
+
+// Global error handler
+window.onerror = function(msg, url, line, col, error) {
+  debug('Global error: ' + msg + ' at ' + line + ':' + col, 'error');
+  return false;
+};
 
 // Start when DOM is ready
 if (document.readyState === 'loading') {

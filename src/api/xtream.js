@@ -66,49 +66,53 @@ XtreamAPI.prototype.request = function(action, params, retries) {
         return;
       }
 
-      // Use iina.http.get with timeout
-      iina.http.get(url, { timeout: REQUEST_TIMEOUT }, function(err, res) {
-        if (currentRequest.cancelled) return;
+      // Use iina.http.get with Promise-based API (IINA 1.4.1)
+      iina.http.get(url, { timeout: REQUEST_TIMEOUT })
+        .then(function(res) {
+          if (currentRequest.cancelled) return;
 
-        self.activeRequest = null;
+          self.activeRequest = null;
 
-        if (err) {
-          Logger.error('HTTP Error: ' + err.message);
+          var text = res.text || res.data || (typeof res === 'string' ? res : null);
+          if (!text) {
+            if (attempt <= retries) {
+              Logger.log('Empty response, retrying... (' + attempt + '/' + retries + ')');
+              setTimeout(tryRequest, 1000 * attempt);
+            } else {
+              reject(new Error('Empty response from server'));
+            }
+            return;
+          }
+
+          try {
+            var data = typeof text === 'string' ? JSON.parse(text) : text;
+            var sizeKB = typeof text === 'string' ? Math.round(text.length / 1024) : 0;
+            Logger.log('Response: ' + (Array.isArray(data) ? data.length + ' items' : 'object') +
+                ' (' + sizeKB + ' KB)');
+            resolve(data);
+          } catch (e) {
+            Logger.error('JSON Parse Error: ' + e.message);
+            if (attempt <= retries) {
+              Logger.log('Parse error, retrying... (' + attempt + '/' + retries + ')');
+              setTimeout(tryRequest, 1000 * attempt);
+            } else {
+              reject(new Error('Invalid JSON response'));
+            }
+          }
+        })
+        .catch(function(err) {
+          if (currentRequest.cancelled) return;
+
+          self.activeRequest = null;
+
+          Logger.error('HTTP Error: ' + (err.message || err));
           if (attempt <= retries) {
             Logger.log('Request failed, retrying... (' + attempt + '/' + retries + ')');
             setTimeout(tryRequest, 1000 * attempt);
           } else {
-            reject(new Error('Network error after ' + retries + ' retries: ' + err.message));
+            reject(new Error('Network error after ' + retries + ' retries: ' + (err.message || err)));
           }
-          return;
-        }
-
-        if (!res || !res.text) {
-          if (attempt <= retries) {
-            Logger.log('Empty response, retrying... (' + attempt + '/' + retries + ')');
-            setTimeout(tryRequest, 1000 * attempt);
-          } else {
-            reject(new Error('Empty response from server'));
-          }
-          return;
-        }
-
-        try {
-          var data = JSON.parse(res.text);
-          var sizeKB = Math.round(res.text.length / 1024);
-          Logger.log('Response: ' + (Array.isArray(data) ? data.length + ' items' : 'object') +
-              ' (' + sizeKB + ' KB)');
-          resolve(data);
-        } catch (e) {
-          Logger.error('JSON Parse Error: ' + e.message);
-          if (attempt <= retries) {
-            Logger.log('Parse error, retrying... (' + attempt + '/' + retries + ')');
-            setTimeout(tryRequest, 1000 * attempt);
-          } else {
-            reject(new Error('Invalid JSON response'));
-          }
-        }
-      });
+        });
     }
 
     tryRequest();

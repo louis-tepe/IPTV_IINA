@@ -1,25 +1,170 @@
 /**
  * IINA IPTV Plugin - Main Window Entry Point
- * Receives play requests from global.js via event-driven communication
- * Tracks playback progress for resume functionality
+ * Uses correct IINA 1.4.1 plugin patterns based on official OpenSubtitles plugin
  */
 
-iina.console.log('[IPTV] Main loaded - Event-driven communication initialized');
+'use strict';
 
+var sidebar = iina.sidebar;
+var event = iina.event;
+var core = iina.core;
+var preferences = iina.preferences;
+var http = iina.http;
+var mpv = iina.mpv;
+
+iina.console.log('[IPTV Main] Plugin main entry loaded');
+
+// ============================================================================
 // Configuration
-var POSITION_SAVE_THRESHOLD = 5; // Save only if position changed by 5+ seconds
-var POSITION_SAVE_THROTTLE = 5000; // Max 1 save per 5 seconds
+// ============================================================================
+
+var POSITION_SAVE_THRESHOLD = 5;
+var POSITION_SAVE_THROTTLE = 5000;
 var lastProcessedTimestamp = 0;
 var currentStreamId = null;
 var currentStreamType = null;
 var lastSavedPosition = 0;
 var lastSaveTime = 0;
 var isTrackingPlayback = false;
+var sidebarInitialized = false;
 
-/**
- * Handle play requests from global.js via event
- * @param {Object} data - Play request data
- */
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+function getConfig() {
+  try {
+    var configStr = preferences.get('iptv_config');
+    if (configStr) return JSON.parse(configStr);
+  } catch (e) {
+    iina.console.error('[IPTV Main] Error reading config: ' + e.message);
+  }
+  return null;
+}
+
+function buildStreamUrl(config, streamId, type) {
+  var ext = type === 'live' ? 'ts' : 'm3u8';
+  var streamType = type === 'live' ? 'live' : type === 'vod' ? 'movie' : 'series';
+  return config.server + '/' + streamType + '/' + config.username + '/' + config.password + '/' + streamId + '.' + ext;
+}
+
+function sendToSidebar(type, data) {
+  try {
+    if (sidebar && typeof sidebar.postMessage === 'function') {
+      sidebar.postMessage(type, data);
+    }
+  } catch (e) {
+    iina.console.error('[IPTV Main] Error sending to sidebar: ' + e.message);
+  }
+}
+
+// ============================================================================
+// API Functions (WebView Proxy for ATS bypass)
+// ============================================================================
+
+// Pending API requests (routed through sidebar WebView to bypass ATS)
+var pendingApiRequests = {};
+var apiRequestIdCounter = 0;
+
+function sidebarApiRequest(url, callback) {
+  var requestId = 'sidebar_req_' + (++apiRequestIdCounter) + '_' + Date.now();
+  pendingApiRequests[requestId] = callback;
+  
+  iina.console.log('[IPTV Main] API request via WebView proxy: ' + requestId);
+  sendToSidebar('api_request', { requestId: requestId, url: url });
+  
+  // Timeout after 30 seconds
+  setTimeout(function() {
+    if (pendingApiRequests[requestId]) {
+      iina.console.error('[IPTV Main] API request timeout: ' + requestId);
+      delete pendingApiRequests[requestId];
+      callback(new Error('Request timeout'));
+    }
+  }, 30000);
+}
+
+function handleApiResponse(data) {
+  if (!data || !data.requestId) {
+    iina.console.error('[IPTV Main] Invalid API response - no requestId');
+    return;
+  }
+  
+  var callback = pendingApiRequests[data.requestId];
+  if (!callback) {
+    iina.console.error('[IPTV Main] No callback for requestId: ' + data.requestId);
+    return;
+  }
+  delete pendingApiRequests[data.requestId];
+  
+  if (!data.success) {
+    iina.console.error('[IPTV Main] API error: ' + (data.error || 'Unknown'));
+    callback(new Error(data.error || 'Network error'));
+    return;
+  }
+  
+  iina.console.log('[IPTV Main] API response received, status: ' + data.statusCode);
+  
+  try {
+    var parsed = JSON.parse(data.text);
+    callback(null, parsed);
+  } catch (e) {
+    iina.console.error('[IPTV Main] API parse error: ' + e.message);
+    callback(new Error('Invalid JSON response'));
+  }
+}
+
+function fetchCategories(type) {
+  var config = getConfig();
+  if (!config || !config.server) {
+    sendToSidebar('error', { message: 'Server not configured' });
+    return;
+  }
+  
+  var action = 'get_' + type + '_categories';
+  var url = config.server + '/player_api.php?username=' + config.username + '&password=' + config.password + '&action=' + action;
+  
+  iina.console.log('[IPTV Main] Fetching categories: ' + type);
+  
+  // Route through WebView proxy to bypass macOS ATS blocking HTTP
+  sidebarApiRequest(url, function(err, data) {
+    if (err) {
+      iina.console.error('[IPTV Main] Failed to fetch categories: ' + err.message);
+      sendToSidebar('error', { message: 'Failed to fetch categories' });
+      return;
+    }
+    iina.console.log('[IPTV Main] Categories received: ' + (data.length || 0));
+    sendToSidebar('categories', data);
+  });
+}
+
+function fetchStreams(type, categoryId, categoryName) {
+  var config = getConfig();
+  if (!config || !config.server) {
+    sendToSidebar('error', { message: 'Server not configured' });
+    return;
+  }
+  
+  var action = type === 'series' ? 'get_series' : 'get_' + type + '_streams';
+  var url = config.server + '/player_api.php?username=' + config.username + '&password=' + config.password + '&action=' + action + '&category_id=' + categoryId;
+  
+  iina.console.log('[IPTV Main] Fetching streams: ' + type + ', category: ' + categoryId);
+  
+  // Route through WebView proxy to bypass macOS ATS blocking HTTP
+  sidebarApiRequest(url, function(err, data) {
+    if (err) {
+      iina.console.error('[IPTV Main] Failed to fetch streams: ' + err.message);
+      sendToSidebar('error', { message: 'Failed to fetch streams' });
+      return;
+    }
+    iina.console.log('[IPTV Main] Streams received: ' + (data.length || 0));
+    sendToSidebar('streams', { streams: data, categoryName: categoryName });
+  });
+}
+
+// ============================================================================
+// Playback Functions
+// ============================================================================
+
 function handlePlayRequest(data) {
   try {
     if (!data) {
@@ -27,137 +172,70 @@ function handlePlayRequest(data) {
       return;
     }
     
-    // Check if this is a new request (avoid playing same request twice)
     if (data.timestamp && data.timestamp <= lastProcessedTimestamp) {
       iina.console.log('[IPTV Main] Duplicate play request ignored');
       return;
     }
     
-    iina.console.log('[IPTV Main] New play request received: ' + JSON.stringify(data));
+    iina.console.log('[IPTV Main] Playing: ' + data.name);
     
-    // Update timestamp BEFORE playing to avoid race conditions
-    lastProcessedTimestamp = data.timestamp;
-    
-    // Store current stream info for tracking
-    currentStreamId = data.streamId || null;
+    lastProcessedTimestamp = data.timestamp || Date.now();
+    currentStreamId = data.streamId || data.id || null;
     currentStreamType = data.type || null;
     
-    // Play the stream
     playStream(data.url, data.name, data.type, data.resumePosition);
   } catch (e) {
     iina.console.error('[IPTV Main] Error handling play request: ' + e.message);
   }
 }
 
-/**
- * Play a stream using available APIs
- * @param {string} url - Stream URL
- * @param {string} name - Stream name
- * @param {string} type - Stream type (live, vod, series)
- * @param {number} [resumePosition] - Optional position to resume from (in seconds)
- */
 function playStream(url, name, type, resumePosition) {
-  iina.console.log('[IPTV Main] Playing stream: ' + name + ' (' + type + ')');
-  iina.console.log('[IPTV Main] URL: ' + url);
-  if (resumePosition) {
-    iina.console.log('[IPTV Main] Resume position: ' + resumePosition + 's');
-  }
+  iina.console.log('[IPTV Main] Opening: ' + url);
 
   try {
-    // Method 1: Try iina.core.open() first
-    if (typeof iina.core !== 'undefined' && typeof iina.core.open === 'function') {
-      iina.core.open(url);
-      iina.console.log('[IPTV Main] ✅ Video opened via iina.core.open()');
-
-      // Start tracking playback progress
-      startPlaybackTracking(resumePosition);
-      return;
-    }
-
-    // Method 2: Fallback to iina.playlist
-    if (typeof iina.playlist !== 'undefined') {
-      iina.playlist.add(url);
-      var items = iina.playlist.items;
-      iina.playlist.playAt(items.length - 1);
-      iina.console.log('[IPTV Main] ✅ Video opened via iina.playlist');
-
-      // Start tracking playback progress
-      startPlaybackTracking(resumePosition);
-      return;
-    }
-
-    // Method 3: Final fallback to mpv
-    if (typeof iina.mpv !== 'undefined' && typeof iina.mpv.command === 'function') {
-      iina.mpv.command('loadfile', [url]);
-      iina.console.log('[IPTV Main] ✅ Video opened via iina.mpv.command()');
-
-      // Start tracking playback progress
-      startPlaybackTracking(resumePosition);
-      return;
+    core.open(url);
+    
+    if (typeof core.osd === 'function') {
+      core.osd('Playing: ' + name);
     }
     
-    iina.console.error('[IPTV Main] ❌ No playback API available');
+    iina.console.log('[IPTV Main] ✓ Video opened');
+    startPlaybackTracking(resumePosition);
   } catch (e) {
-    iina.console.error('[IPTV Main] ❌ Error opening video: ' + e.message);
-    iina.console.error('[IPTV Main] Stack: ' + (e.stack || 'no stack'));
+    iina.console.error('[IPTV Main] Error opening video: ' + e.message);
   }
 }
 
-/**
- * Start tracking playback progress for resume functionality
- * @param {number} [initialPosition] - Optional initial position to seek to
- */
 function startPlaybackTracking(initialPosition) {
-  iina.console.log('[IPTV Main] Starting playback tracking (event-driven)');
-
-  // Seek to initial position if provided (resume functionality)
   if (initialPosition && initialPosition > 0) {
     setTimeout(function() {
       try {
-        if (typeof iina.mpv !== 'undefined' && typeof iina.mpv.command === 'function') {
-          iina.mpv.command('seek', [String(initialPosition), 'absolute']);
-          iina.console.log('[IPTV Main] ✅ Resumed from position: ' + initialPosition + 's');
-          lastSavedPosition = initialPosition;
-        }
+        mpv.command('seek', [String(initialPosition), 'absolute']);
+        iina.console.log('[IPTV Main] Resumed from: ' + initialPosition + 's');
+        lastSavedPosition = initialPosition;
       } catch (e) {
-        iina.console.error('[IPTV Main] Failed to seek to resume position: ' + e.message);
+        iina.console.error('[IPTV Main] Failed to seek: ' + e.message);
       }
-    }, 500); // Wait 500ms for video to start loading
+    }, 500);
   }
-
   isTrackingPlayback = true;
-  iina.console.log('[IPTV Main] ✓ Event-driven position tracking active');
 }
 
-/**
- * Save current playback position to preferences (with throttling)
- * This is called when position changes significantly
- * @param {number} [position] - Optional position to save (if not provided, will fetch from mpv)
- */
 function saveCurrentPosition(position) {
-  if (!currentStreamId) {
-    return; // No active stream to track
-  }
+  if (!currentStreamId) return;
 
-  // Throttling check
   var now = Date.now();
-  if (now - lastSaveTime < POSITION_SAVE_THROTTLE) {
-    return; // Skip save if we saved recently
-  }
+  if (now - lastSaveTime < POSITION_SAVE_THROTTLE) return;
 
   try {
     var pos = position;
     var duration = 0;
 
-    // Get current position from mpv if not provided
     if (pos === undefined) {
-      if (typeof iina.mpv !== 'undefined' && typeof iina.mpv.getNumber === 'function') {
-        pos = iina.mpv.getNumber('time-pos') || 0;
-        duration = iina.mpv.getNumber('duration') || 0;
-      }
+      pos = mpv.getNumber('time-pos') || 0;
+      duration = mpv.getNumber('duration') || 0;
     }
 
-    // Only save if we have meaningful data and position changed significantly
     if (pos > 0 && Math.abs(pos - lastSavedPosition) > POSITION_SAVE_THRESHOLD) {
       var resumeData = {
         streamId: currentStreamId,
@@ -167,106 +245,236 @@ function saveCurrentPosition(position) {
         updatedAt: now
       };
 
-      iina.preferences.set('iptv_current_resume', JSON.stringify(resumeData));
+      preferences.set('iptv_current_resume', JSON.stringify(resumeData));
       lastSavedPosition = pos;
       lastSaveTime = now;
-
-      // Emit event to notify global.js
-      try {
-        iina.event.emit('iptv.resumePositionUpdated', {
-          streamId: currentStreamId,
-          position: Math.floor(pos),
-          duration: Math.floor(duration),
-          updatedAt: now
-        });
-        iina.console.log('[IPTV Main] Position saved & event emitted: ' + Math.floor(pos) + 's / ' + Math.floor(duration) + 's');
-      } catch (emitErr) {
-        iina.console.error('[IPTV Main] Failed to emit resumePositionUpdated event: ' + emitErr.message);
-      }
     }
   } catch (e) {
     iina.console.error('[IPTV Main] Error saving position: ' + e.message);
   }
 }
 
-/**
- * Clear resume position when playback ends
- */
 function clearResumePosition() {
   if (currentStreamId) {
     try {
-      iina.preferences.set('iptv_current_resume', null);
-      iina.console.log('[IPTV Main] Resume position cleared for: ' + currentStreamId);
-    } catch (e) {
-      iina.console.error('[IPTV Main] Error clearing resume position: ' + e.message);
-    }
+      preferences.set('iptv_current_resume', null);
+    } catch (e) {}
   }
 }
 
-/**
- * Handle file loaded event
- */
-function onFileLoaded() {
-  iina.console.log('[IPTV Main] File loaded event received');
-  // Reset position tracking when a new file loads
-  isTrackingPlayback = false;
-  startPlaybackTracking();
+// ============================================================================
+// Sidebar Message Handler
+// ============================================================================
+
+function handleSidebarMessage(name, data) {
+  iina.console.log('[IPTV Main] Sidebar message: ' + name);
+  
+  switch (name) {
+    case 'ready':
+      // Sidebar is ready, send config status
+      var config = getConfig();
+      sendToSidebar('init', {
+        configured: !!(config && config.server),
+        server: config ? config.server : null
+      });
+      break;
+      
+    case 'getCategories':
+      if (data && data.type) {
+        fetchCategories(data.type);
+      }
+      break;
+      
+    case 'getStreams':
+      if (data && data.type && data.categoryId) {
+        fetchStreams(data.type, data.categoryId, data.categoryName);
+      }
+      break;
+      
+    case 'play':
+      if (data) {
+        var config = getConfig();
+        if (config && config.server) {
+          var url = buildStreamUrl(config, data.id, data.type);
+          handlePlayRequest({
+            url: url,
+            name: data.name,
+            type: data.type,
+            streamId: data.id,
+            timestamp: Date.now()
+          });
+        } else {
+          sendToSidebar('error', { message: 'Server not configured' });
+        }
+      }
+      break;
+      
+    case 'error':
+      iina.console.error('[IPTV Main] Sidebar error: ' + JSON.stringify(data));
+      break;
+  }
 }
 
-/**
- * Handle time position change event from mpv
- * @param {number} newPosition - New playback position in seconds
- */
-function onTimePositionChanged(newPosition) {
-  if (!isTrackingPlayback || !currentStreamId) {
+// ============================================================================
+// Initialize Sidebar (CORRECT PATTERN - inside window-loaded event)
+// ============================================================================
+
+event.on('iina.window-loaded', function() {
+  iina.console.log('[IPTV Main] Window loaded - initializing sidebar');
+  
+  if (sidebarInitialized) {
+    iina.console.log('[IPTV Main] Sidebar already initialized');
     return;
   }
-
-  // Save only if position changed significantly (throttled)
-  if (Math.abs(newPosition - lastSavedPosition) > POSITION_SAVE_THRESHOLD) {
-    saveCurrentPosition(newPosition);
+  
+  try {
+    // Load sidebar HTML file - this is the CORRECT pattern
+    sidebar.loadFile('ui/browser.html');
+    iina.console.log('[IPTV Main] ✓ Sidebar HTML loaded: ui/browser.html');
+    
+    // Set up per-message handlers (IINA 1.4 API requires separate handlers)
+    sidebar.onMessage('ready', function(data) {
+      iina.console.log('[IPTV Main] Sidebar ready signal received');
+      var config = getConfig();
+      sendToSidebar('init', {
+        configured: !!(config && config.server),
+        server: config ? config.server : null
+      });
+    });
+    
+    sidebar.onMessage('getCategories', function(data) {
+      iina.console.log('[IPTV Main] getCategories request: ' + (data ? data.type : 'unknown'));
+      if (data && data.type) {
+        fetchCategories(data.type);
+      }
+    });
+    
+    sidebar.onMessage('getStreams', function(data) {
+      iina.console.log('[IPTV Main] getStreams request');
+      if (data && data.type && data.categoryId) {
+        fetchStreams(data.type, data.categoryId, data.categoryName);
+      }
+    });
+    
+    sidebar.onMessage('play', function(data) {
+      iina.console.log('[IPTV Main] play request: ' + (data ? data.name : 'unknown'));
+      if (data) {
+        var config = getConfig();
+        if (config && config.server) {
+          var url = buildStreamUrl(config, data.id, data.type);
+          handlePlayRequest({
+            url: url,
+            name: data.name,
+            type: data.type,
+            streamId: data.id,
+            timestamp: Date.now()
+          });
+        } else {
+          sendToSidebar('error', { message: 'Server not configured' });
+        }
+      }
+    });
+    
+    sidebar.onMessage('api_response', function(data) {
+      iina.console.log('[IPTV Main] API response received via sidebar');
+      handleApiResponse(data);
+    });
+    
+    sidebar.onMessage('error', function(data) {
+      iina.console.error('[IPTV Main] Sidebar error: ' + JSON.stringify(data));
+    });
+    
+    iina.console.log('[IPTV Main] ✓ Sidebar message handlers registered');
+    
+    sidebarInitialized = true;
+  } catch (e) {
+    iina.console.error('[IPTV Main] Failed to initialize sidebar: ' + e.message);
   }
-}
+});
 
-/**
- * Handle playback end event
- */
-function onPlaybackEnd() {
-  iina.console.log('[IPTV Main] Playback end event received');
+// ============================================================================
+// Event Handlers
+// ============================================================================
+
+event.on('iina.file-loaded', function() {
+  iina.console.log('[IPTV Main] File loaded');
   isTrackingPlayback = false;
+  startPlaybackTracking();
+});
 
-  // Final save before clearing
+event.on('mpv.end-file', function() {
+  iina.console.log('[IPTV Main] Playback ended');
+  isTrackingPlayback = false;
   saveCurrentPosition();
-
   clearResumePosition();
   currentStreamId = null;
   currentStreamType = null;
   lastSavedPosition = 0;
   lastSaveTime = 0;
-}
+});
 
-/**
- * Handle window will close event (safety save)
- */
-function onWindowWillClose() {
-  iina.console.log('[IPTV Main] Window will close event received');
+event.on('mpv.time-pos.changed', function(pos) {
+  if (isTrackingPlayback && currentStreamId) {
+    if (Math.abs(pos - lastSavedPosition) > POSITION_SAVE_THRESHOLD) {
+      saveCurrentPosition(pos);
+    }
+  }
+});
 
-  // Final save before window closes
+event.on('iina.window-will-close', function() {
+  iina.console.log('[IPTV Main] Window will close');
   if (isTrackingPlayback && currentStreamId) {
     saveCurrentPosition();
   }
+});
+
+// ============================================================================
+// Polling for requests from global.js
+// ============================================================================
+
+var lastCheckedTimestamp = 0;
+var lastBrowserRequestTimestamp = 0;
+
+function checkForPlayRequests() {
+  try {
+    var playRequestStr = preferences.get('iptv_play_request');
+    if (playRequestStr) {
+      var data = JSON.parse(playRequestStr);
+      if (data.timestamp && data.timestamp > lastCheckedTimestamp) {
+        lastCheckedTimestamp = data.timestamp;
+        handlePlayRequest(data);
+        preferences.set('iptv_play_request', null);
+      }
+    }
+  } catch (e) { /* ignore */ }
 }
 
-// Set up event listeners for playback tracking and play requests
-if (typeof iina.event !== 'undefined') {
-  iina.event.on('iina.file-loaded', onFileLoaded);
-  iina.event.on('mpv.end-file', onPlaybackEnd);
-  iina.event.on('mpv.time-pos.changed', onTimePositionChanged);
-  iina.event.on('iina.window-will-close', onWindowWillClose);
-  iina.event.on('iptv.play', handlePlayRequest);
-  iina.console.log('[IPTV Main] ✓ Event listeners registered (event-driven, no polling)');
-} else {
-  iina.console.error('[IPTV Main] iina.event not available - plugin cannot function');
+function checkForBrowserRequests() {
+  try {
+    var browserRequestStr = preferences.get('iptv_browser_request');
+    if (browserRequestStr) {
+      var data = JSON.parse(browserRequestStr);
+      if (data.timestamp && data.timestamp > lastBrowserRequestTimestamp) {
+        lastBrowserRequestTimestamp = data.timestamp;
+        iina.console.log('[IPTV Main] Browser request received, opening sidebar');
+        
+        // Open the sidebar
+        if (sidebar && typeof sidebar.show === 'function') {
+          sidebar.show();
+          iina.console.log('[IPTV Main] Sidebar opened');
+        }
+        
+        // Clear the request
+        preferences.set('iptv_browser_request', null);
+      }
+    }
+  } catch (e) { /* ignore */ }
 }
 
-iina.console.log('[IPTV Main] Initialization complete - Waiting for play requests from global.js');
+setInterval(function() {
+  checkForPlayRequests();
+  checkForBrowserRequests();
+}, 500);
+
+iina.console.log('[IPTV Main] Initialization complete');
+

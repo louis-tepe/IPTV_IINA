@@ -8,7 +8,7 @@
 'use strict';
 
 /** @const {boolean} DEBUG - Set to true to enable debug mode */
-const DEBUG = false;
+const DEBUG = true;
 
 /** @type {number} Debug message counter */
 let debugMsgCount = 0;

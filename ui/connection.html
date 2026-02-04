@@ -100,7 +100,9 @@
       }
 
       if (window.iina && iina.onMessage) {
+        // Listen for 'init' message (filtered by name)
         iina.onMessage('init', function(data) {
+          console.log('[Connection] Init received:', data);
           if (data) {
             if (data.server) serverInput.value = data.server;
             if (data.username) usernameInput.value = data.username;
@@ -112,15 +114,62 @@
           }
         });
 
-        iina.onMessage('error', function(message) {
+        // Listen for 'error' message
+        iina.onMessage('error', function(data) {
+          console.log('[Connection] Error received:', data);
           connectBtn.classList.remove('loading');
           connectBtn.disabled = false;
-          errorDiv.textContent = message || t('connection.error');
+          errorDiv.textContent = (data && data.message) || t('connection.error');
           errorDiv.hidden = false;
         });
 
-        iina.onMessage('success', function() {
+        // Listen for 'success' message
+        iina.onMessage('success', function(data) {
+          console.log('[Connection] Success received');
           connectBtn.classList.remove('loading');
+          connectBtn.textContent = 'Connected!';
+        });
+
+        // HTTP Proxy: Handle API requests from plugin (bypasses ATS)
+        // WebViews can make HTTP requests without ATS blocking
+        iina.onMessage('api_request', function(data) {
+          console.log('[Connection] API request received:', data);
+          var requestId = data.requestId;
+          var url = data.url;
+          
+          fetch(url, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            }
+          })
+          .then(function(response) {
+            console.log('[Connection] Fetch response status:', response.status);
+            return response.text().then(function(text) {
+              return {
+                statusCode: response.status,
+                text: text,
+                ok: response.ok
+              };
+            });
+          })
+          .then(function(result) {
+            console.log('[Connection] Sending api_response:', result.statusCode);
+            iina.postMessage('api_response', {
+              requestId: requestId,
+              success: true,
+              statusCode: result.statusCode,
+              text: result.text
+            });
+          })
+          .catch(function(err) {
+            console.error('[Connection] Fetch error:', err);
+            iina.postMessage('api_response', {
+              requestId: requestId,
+              success: false,
+              error: err.message || String(err)
+            });
+          });
         });
       }
 
@@ -147,6 +196,7 @@
         connectBtn.disabled = true;
 
         if (window.iina && iina.postMessage) {
+          // Send as postMessage(name, data) per OpenSubtitles pattern
           iina.postMessage('connect', {
             server: server,
             username: username,
@@ -156,7 +206,8 @@
       });
 
       if (window.iina && iina.postMessage) {
-        iina.postMessage('ready');
+        // Signal that window is ready
+        iina.postMessage('ready', {});
       }
     })();
   </script>

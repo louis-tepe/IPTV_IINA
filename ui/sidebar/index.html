@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IPTV Browser</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        background: #1c1c1e;
+        color: #f5f5f7;
+        min-height: 100vh;
+        padding: 12px;
+      }
+      .header {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+      .tab {
+        padding: 8px 16px;
+        border: none;
+        background: #2c2c2e;
+        color: #8e8e93;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s;
+      }
+      .tab:hover {
+        background: #3a3a3c;
+      }
+      .tab.active {
+        background: #0a84ff;
+        color: white;
+      }
+      .search-box {
+        width: 100%;
+        padding: 10px 12px;
+        border: none;
+        background: #2c2c2e;
+        color: #f5f5f7;
+        border-radius: 8px;
+        font-size: 14px;
+        margin-bottom: 16px;
+      }
+      .search-box::placeholder {
+        color: #8e8e93;
+      }
+      .content {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: #2c2c2e;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .item:hover {
+        background: #3a3a3c;
+        transform: translateX(4px);
+      }
+      .item-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: #0a84ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+      }
+      .item-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .item-name {
+        font-weight: 500;
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .item-meta {
+        font-size: 12px;
+        color: #8e8e93;
+        margin-top: 2px;
+      }
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: #8e8e93;
+      }
+      .spinner {
+        width: 24px;
+        height: 24px;
+        border: 2px solid #3a3a3c;
+        border-top-color: #0a84ff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 12px;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .message {
+        text-align: center;
+        padding: 40px 20px;
+        color: #8e8e93;
+      }
+      .message h2 {
+        font-size: 16px;
+        margin-bottom: 8px;
+        color: #f5f5f7;
+      }
+      .message p {
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .btn-primary {
+        display: inline-block;
+        margin-top: 16px;
+        padding: 10px 20px;
+        background: #0a84ff;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .btn-primary:hover {
+        background: #0070e0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <button class="tab active" data-type="live">📺 Live</button>
+      <button class="tab" data-type="vod">🎬 VOD</button>
+      <button class="tab" data-type="series">📚 Series</button>
+    </div>
+    
+    <input type="text" class="search-box" placeholder="Search..." id="search" />
+    
+    <div id="content" class="content">
+      <div class="message">
+        <h2>IPTV Browser</h2>
+        <p>Configure your IPTV server to browse content.</p>
+        <button class="btn-primary" id="configure-btn">Configure Server</button>
+      </div>
+    </div>
+
+    <script>
+      // State
+      let currentType = 'live';
+      let categories = [];
+      let streams = [];
+      let isConfigured = false;
+      
+      // DOM elements
+      const content = document.getElementById('content');
+      const searchInput = document.getElementById('search');
+      const tabs = document.querySelectorAll('.tab');
+      const configureBtn = document.getElementById('configure-btn');
+      
+      // Tab switching
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          tabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          currentType = tab.dataset.type;
+          loadCategories();
+        });
+      });
+      
+      // Configure button
+      if (configureBtn) {
+        configureBtn.addEventListener('click', () => {
+          if (typeof iina !== 'undefined' && iina.postMessage) {
+            iina.postMessage({ action: 'configure' });
+          }
+        });
+      }
+      
+      // Search
+      searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        filterContent(query);
+      });
+      
+      // Show loading
+      function showLoading() {
+        content.innerHTML = `
+          <div class="loading">
+            <div class="spinner"></div>
+            <div>Loading...</div>
+          </div>
+        `;
+      }
+      
+      // Show message
+      function showMessage(title, text) {
+        content.innerHTML = `
+          <div class="message">
+            <h2>${title}</h2>
+            <p>${text}</p>
+          </div>
+        `;
+      }
+      
+      // Render categories
+      function renderCategories(data) {
+        if (!data || data.length === 0) {
+          showMessage('No Categories', 'No categories found for this type.');
+          return;
+        }
+        
+        content.innerHTML = data.slice(0, 50).map(cat => `
+          <div class="item" data-id="${cat.category_id}" data-name="${cat.category_name}">
+            <div class="item-icon">📁</div>
+            <div class="item-info">
+              <div class="item-name">${cat.category_name}</div>
+              <div class="item-meta">${cat.num || ''} items</div>
+            </div>
+          </div>
+        `).join('');
+        
+        // Add click handlers
+        content.querySelectorAll('.item').forEach(item => {
+          item.addEventListener('click', () => {
+            const id = item.dataset.id;
+            const name = item.dataset.name;
+            loadStreams(id, name);
+          });
+        });
+      }
+      
+      // Render streams
+      function renderStreams(data, categoryName) {
+        if (!data || data.length === 0) {
+          showMessage('No Content', 'No streams found in this category.');
+          return;
+        }
+        
+        // Add back button
+        let html = `
+          <div class="item" id="back-btn">
+            <div class="item-icon">⬅️</div>
+            <div class="item-info">
+              <div class="item-name">Back to Categories</div>
+            </div>
+          </div>
+        `;
+        
+        html += data.slice(0, 100).map(stream => `
+          <div class="item stream" data-id="${stream.stream_id || stream.series_id}" data-name="${stream.name}" data-type="${currentType}">
+            <div class="item-icon">${currentType === 'live' ? '📺' : currentType === 'vod' ? '🎬' : '📚'}</div>
+            <div class="item-info">
+              <div class="item-name">${stream.name}</div>
+              <div class="item-meta">${stream.category_name || categoryName}</div>
+            </div>
+          </div>
+        `).join('');
+        
+        content.innerHTML = html;
+        
+        // Back button handler
+        document.getElementById('back-btn').addEventListener('click', loadCategories);
+        
+        // Stream click handlers
+        content.querySelectorAll('.stream').forEach(item => {
+          item.addEventListener('click', () => {
+            if (typeof iina !== 'undefined' && iina.postMessage) {
+              iina.postMessage({
+                action: 'play',
+                id: item.dataset.id,
+                name: item.dataset.name,
+                type: item.dataset.type
+              });
+            }
+          });
+        });
+      }
+      
+      // Filter content
+      function filterContent(query) {
+        content.querySelectorAll('.item').forEach(item => {
+          const name = item.dataset.name?.toLowerCase() || '';
+          item.style.display = name.includes(query) ? 'flex' : 'none';
+        });
+      }
+      
+      // Load categories from plugin
+      function loadCategories() {
+        showLoading();
+        if (typeof iina !== 'undefined' && iina.postMessage) {
+          iina.postMessage({ action: 'getCategories', type: currentType });
+        } else {
+          showMessage('Not Connected', 'Plugin communication not available.');
+        }
+      }
+      
+      // Load streams from plugin
+      function loadStreams(categoryId, categoryName) {
+        showLoading();
+        if (typeof iina !== 'undefined' && iina.postMessage) {
+          iina.postMessage({ 
+            action: 'getStreams', 
+            type: currentType, 
+            categoryId: categoryId,
+            categoryName: categoryName
+          });
+        }
+      }
+      
+      // Receive messages from plugin
+      if (typeof iina !== 'undefined' && iina.onMessage) {
+        iina.onMessage('categories', (data) => {
+          categories = data;
+          renderCategories(data);
+        });
+        
+        iina.onMessage('streams', (data) => {
+          streams = data.streams;
+          renderStreams(data.streams, data.categoryName);
+        });
+        
+        iina.onMessage('configured', (data) => {
+          isConfigured = true;
+          loadCategories();
+        });
+        
+        iina.onMessage('error', (data) => {
+          showMessage('Error', data.message || 'An error occurred.');
+        });
+      }
+      
+      // Initialize
+      document.addEventListener('DOMContentLoaded', () => {
+        // Request initial data
+        if (typeof iina !== 'undefined' && iina.postMessage) {
+          iina.postMessage({ action: 'init' });
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IPTV Player</title>
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #12121a;
+      --bg-card: #1a1a24;
+      --bg-hover: #252532;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0b0;
+      --accent: #e50914;
+      --accent-hover: #ff1a1a;
+      --border: rgba(255,255,255,0.1);
+      --shadow: 0 8px 32px rgba(0,0,0,0.4);
+      --radius: 8px;
+      --transition: all 0.3s ease;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    
+    .hidden { display: none !important; }
+    
+    /* ========== CONNECTION VIEW ========== */
+    #connection-view {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .connection-container {
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    
+    .logo-large {
+      margin-bottom: 30px;
+    }
+    
+    .logo-large svg {
+      width: 80px;
+      height: 80px;
+      stroke: #007AFF;
+    }
+    
+    .logo-large h1 {
+      font-size: 28px;
+      margin-top: 16px;
+      background: linear-gradient(135deg, #007AFF, #00C6FF);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: var(--text-secondary);
+    }
+    
+    .form-group input {
+      width: 100%;
+      padding: 14px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-primary);
+      font-size: 16px;
+      transition: var(--transition);
+    }
+    
+    .form-group input:focus {
+      outline: none;
+      border-color: #007AFF;
+    }
+    
+    .form-group .hint {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 6px;
+    }
+    
+    .connect-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #007AFF, #00A8FF);
+      border: none;
+      border-radius: var(--radius);
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      margin-top: 10px;
+    }
+    
+    .connect-btn:hover { transform: translateY(-2px); opacity: 0.9; }
+    .connect-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .connect-btn.loading { pointer-events: none; }
+    
+    .error-msg {
+      background: rgba(229, 9, 20, 0.1);
+      border: 1px solid rgba(229, 9, 20, 0.3);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-top: 16px;
+      color: #ff6b6b;
+      font-size: 14px;
+    }
+    
+    /* ========== BROWSER VIEW ========== */
+    #browser-view { min-height: 100vh; }
+    
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: linear-gradient(180deg, var(--bg-primary) 0%, transparent 100%);
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 14px;
+    }
+    
+    .back-btn:hover { background: var(--bg-hover); }
+    
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    
+    .logo-text {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    
+    .settings-btn {
+      padding: 10px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 14px;
+    }
+    
+    .settings-btn:hover { background: var(--bg-hover); }
+    
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      padding: 0 40px;
+      margin-bottom: 30px;
+    }
+    
+    .nav-tab {
+      padding: 12px 24px;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 24px;
+      transition: var(--transition);
+    }
+    
+    .nav-tab:hover { color: var(--text-primary); background: var(--bg-card); }
+    .nav-tab.active { background: var(--accent); color: white; }
+    
+    .content { padding: 0 40px 40px; }
+    
+    .section-title {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    
+    .section-title .count {
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+    
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 20px;
+    }
+    
+    .category-card {
+      background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
+      border-radius: 12px;
+      padding: 24px;
+      cursor: pointer;
+      transition: var(--transition);
+      border: 1px solid var(--border);
+    }
+    
+    .category-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+      box-shadow: 0 8px 24px rgba(229, 9, 20, 0.2);
+    }
+    
+    .category-card-icon { font-size: 32px; margin-bottom: 12px; }
+    .category-card-name { font-size: 16px; font-weight: 600; }
+    
+    .card {
+      background: var(--bg-card);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: var(--transition);
+      position: relative;
+    }
+    
+    .card:hover {
+      transform: translateY(-8px) scale(1.02);
+      box-shadow: var(--shadow);
+    }
+    
+    .card-poster {
+      aspect-ratio: 2/3;
+      background: var(--bg-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    
+    .card-poster img { width: 100%; height: 100%; object-fit: cover; }
+    .card-poster .placeholder { font-size: 48px; opacity: 0.3; }
+    
+    .card-info { padding: 12px; }
+    .card-title {
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .card-meta { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+    
+    .card-play {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      width: 60px;
+      height: 60px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: var(--transition);
+    }
+    
+    .card:hover .card-play {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+    
+    .card-play svg { width: 24px; height: 24px; fill: white; margin-left: 4px; }
+    
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 40px;
+      gap: 20px;
+    }
+    
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid var(--bg-hover);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .loading-text { color: var(--text-secondary); font-size: 16px; }
+    
+    .empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 40px;
+      text-align: center;
+    }
+    
+    .empty-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.5; }
+    .empty-text { color: var(--text-secondary); font-size: 16px; }
+  </style>
+</head>
+<body>
+  <!-- CONNECTION VIEW -->
+  <div id="connection-view">
+    <div class="connection-container">
+      <div class="logo-large">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="4" width="20" height="14" rx="2"/>
+          <path d="M8 21h8M12 18v3"/>
+          <path d="M7 8l3 3-3 3M12 14h4"/>
+        </svg>
+        <h1>IPTV Player</h1>
+      </div>
+      
+      <form id="connection-form">
+        <div class="form-group">
+          <label>Server URL</label>
+          <input type="text" id="server" placeholder="http://example.com:8080">
+          <div class="hint">Include the port number (e.g., :8080)</div>
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="username" placeholder="Your username">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="password" placeholder="Your password">
+        </div>
+        <button type="submit" id="connect-btn" class="connect-btn">Connect</button>
+      </form>
+      <div id="error-msg" class="error-msg hidden"></div>
+    </div>
+  </div>
+
+  <!-- BROWSER VIEW -->
+  <div id="browser-view" class="hidden">
+    <header class="header">
+      <div class="header-left">
+        <button id="back-btn" class="back-btn hidden">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Retour
+        </button>
+        <div class="logo">
+          <div class="logo-icon">TV</div>
+          <span class="logo-text">IPTV Browser</span>
+        </div>
+      </div>
+      <button id="settings-btn" class="settings-btn">⚙️ Paramètres</button>
+    </header>
+
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-type="live">📺 Live TV</button>
+      <button class="nav-tab" data-type="vod">🎬 Films</button>
+      <button class="nav-tab" data-type="series">📚 Séries</button>
+    </nav>
+
+    <main class="content">
+      <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <div class="loading-text">Chargement...</div>
+      </div>
+      
+      <div id="empty" class="empty hidden">
+        <div class="empty-icon">📭</div>
+        <div class="empty-text" id="empty-message">Aucun contenu</div>
+      </div>
+      
+      <div id="categories-section">
+        <div class="section-title">Catégories <span id="category-count" class="count"></span></div>
+        <div id="categories-grid" class="cards-grid"></div>
+      </div>
+      
+      <div id="streams-section" class="hidden">
+        <div class="section-title" id="streams-title">Streams</div>
+        <div id="streams-grid" class="cards-grid"></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+      
+      // ========== STATE ==========
+      var config = { server: '', username: '', password: '' };
+      var currentView = 'connection'; // 'connection' or 'browser'
+      var currentType = 'live';
+      var isShowingStreams = false;
+      
+      // ========== DOM ELEMENTS ==========
+      var connectionView = document.getElementById('connection-view');
+      var browserView = document.getElementById('browser-view');
+      var form = document.getElementById('connection-form');
+      var serverInput = document.getElementById('server');
+      var usernameInput = document.getElementById('username');
+      var passwordInput = document.getElementById('password');
+      var connectBtn = document.getElementById('connect-btn');
+      var errorMsg = document.getElementById('error-msg');
+      var loadingEl = document.getElementById('loading');
+      var emptyEl = document.getElementById('empty');
+      var emptyMessage = document.getElementById('empty-message');
+      var categoriesSection = document.getElementById('categories-section');
+      var categoriesGrid = document.getElementById('categories-grid');
+      var categoryCount = document.getElementById('category-count');
+      var streamsSection = document.getElementById('streams-section');
+      var streamsGrid = document.getElementById('streams-grid');
+      var streamsTitle = document.getElementById('streams-title');
+      var backBtn = document.getElementById('back-btn');
+      var settingsBtn = document.getElementById('settings-btn');
+      var tabs = document.querySelectorAll('.nav-tab');
+      
+      function log(msg) { console.log('[MainWindow] ' + msg); }
+      
+      // ========== VIEW SWITCHING ==========
+      function showConnectionView() {
+        currentView = 'connection';
+        connectionView.classList.remove('hidden');
+        browserView.classList.add('hidden');
+        log('Switched to connection view');
+      }
+      
+      function showBrowserView() {
+        currentView = 'browser';
+        connectionView.classList.add('hidden');
+        browserView.classList.remove('hidden');
+        loadCategories();
+        log('Switched to browser view');
+      }
+      
+      function showLoading() {
+        loadingEl.classList.remove('hidden');
+        emptyEl.classList.add('hidden');
+        categoriesSection.classList.add('hidden');
+        streamsSection.classList.add('hidden');
+      }
+      
+      function hideLoading() { loadingEl.classList.add('hidden'); }
+      
+      function showEmpty(msg) {
+        hideLoading();
+        emptyEl.classList.remove('hidden');
+        emptyMessage.textContent = msg || 'Aucun contenu';
+        categoriesSection.classList.add('hidden');
+        streamsSection.classList.add('hidden');
+      }
+      
+      function showCategories() {
+        isShowingStreams = false;
+        backBtn.classList.add('hidden');
+        categoriesSection.classList.remove('hidden');
+        streamsSection.classList.add('hidden');
+        emptyEl.classList.add('hidden');
+      }
+      
+      function showStreams(catName) {
+        isShowingStreams = true;
+        backBtn.classList.remove('hidden');
+        categoriesSection.classList.add('hidden');
+        streamsSection.classList.remove('hidden');
+        streamsTitle.textContent = catName;
+        emptyEl.classList.add('hidden');
+      }
+      
+      // ========== API CALLS ==========
+      function buildApiUrl(action, params) {
+        var url = config.server + '/player_api.php?username=' + encodeURIComponent(config.username) + 
+                  '&password=' + encodeURIComponent(config.password);
+        if (action) url += '&action=' + action;
+        if (params) {
+          for (var key in params) {
+            url += '&' + key + '=' + encodeURIComponent(params[key]);
+          }
+        }
+        return url;
+      }
+      
+      function apiRequest(action, params, callback) {
+        var url = buildApiUrl(action, params);
+        log('API request: ' + (action || 'user_info'));
+        
+        fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } })
+          .then(function(res) { return res.json(); })
+          .then(function(data) { callback(null, data); })
+          .catch(function(err) { callback(err); });
+      }
+      
+      // ========== CONNECTION ==========
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        config.server = serverInput.value.trim();
+        config.username = usernameInput.value.trim();
+        config.password = passwordInput.value.trim();
+        
+        if (!config.server || !config.username || !config.password) {
+          errorMsg.textContent = 'Veuillez remplir tous les champs';
+          errorMsg.classList.remove('hidden');
+          return;
+        }
+        
+        if (config.server.indexOf('http') !== 0) {
+          config.server = 'http://' + config.server;
+          serverInput.value = config.server;
+        }
+        
+        errorMsg.classList.add('hidden');
+        connectBtn.disabled = true;
+        connectBtn.textContent = 'Connexion...';
+        
+        apiRequest(null, null, function(err, data) {
+          if (err || (data && data.user_info && data.user_info.auth === 0)) {
+            errorMsg.textContent = 'Échec de connexion: ' + (err ? err.message : 'Authentification refusée');
+            errorMsg.classList.remove('hidden');
+            connectBtn.disabled = false;
+            connectBtn.textContent = 'Connect';
+            return;
+          }
+          
+          log('Connection successful!');
+          
+          // Save config to plugin
+          if (typeof iina !== 'undefined' && iina.postMessage) {
+            iina.postMessage('save_config', config);
+          }
+          
+          showBrowserView();
+          connectBtn.disabled = false;
+          connectBtn.textContent = 'Connect';
+        });
+      });
+      
+      // ========== BROWSER ==========
+      function getIcon(type) {
+        return type === 'live' ? '📺' : type === 'vod' ? '🎬' : '📚';
+      }
+      
+      function loadCategories() {
+        showLoading();
+        var action = 'get_' + currentType + '_categories';
+        
+        apiRequest(action, null, function(err, data) {
+          hideLoading();
+          
+          if (err) {
+            showEmpty('Erreur: ' + err.message);
+            return;
+          }
+          
+          if (!data || data.length === 0) {
+            showEmpty('Aucune catégorie trouvée');
+            return;
+          }
+          
+          showCategories();
+          categoryCount.textContent = '(' + data.length + ')';
+          
+          categoriesGrid.innerHTML = data.map(function(cat) {
+            var name = cat.category_name || cat.name || 'Inconnu';
+            var id = cat.category_id || cat.id;
+            return '<div class="category-card" data-id="' + id + '" data-name="' + name.replace(/"/g, '&quot;') + '">' +
+              '<div class="category-card-icon">' + getIcon(currentType) + '</div>' +
+              '<div class="category-card-name">' + name + '</div>' +
+            '</div>';
+          }).join('');
+          
+          categoriesGrid.querySelectorAll('.category-card').forEach(function(el) {
+            el.addEventListener('click', function() {
+              loadStreams(el.getAttribute('data-id'), el.getAttribute('data-name'));
+            });
+          });
+          
+          log('Rendered ' + data.length + ' categories');
+        });
+      }
+      
+      function loadStreams(categoryId, categoryName) {
+        showLoading();
+        var action = currentType === 'series' ? 'get_series' : 'get_' + currentType + '_streams';
+        
+        apiRequest(action, { category_id: categoryId }, function(err, data) {
+          hideLoading();
+          
+          if (err) {
+            showEmpty('Erreur: ' + err.message);
+            return;
+          }
+          
+          if (!data || data.length === 0) {
+            showEmpty('Aucun contenu dans cette catégorie');
+            return;
+          }
+          
+          showStreams(categoryName);
+          
+          streamsGrid.innerHTML = data.map(function(stream) {
+            var name = stream.name || 'Inconnu';
+            var id = stream.stream_id || stream.series_id || stream.id;
+            var poster = stream.stream_icon || stream.cover || '';
+            var year = stream.year || '';
+            var rating = stream.rating || '';
+            
+            var posterHtml = poster 
+              ? '<img src="' + poster + '" loading="lazy" onerror="this.outerHTML=\'<div class=placeholder>' + getIcon(currentType) + '</div>\'">'
+              : '<div class="placeholder">' + getIcon(currentType) + '</div>';
+            
+            var metaHtml = '';
+            if (year) metaHtml += year;
+            if (rating) metaHtml += (metaHtml ? ' • ' : '') + '⭐ ' + rating;
+            
+            return '<div class="card" data-id="' + id + '" data-name="' + name.replace(/"/g, '&quot;') + '">' +
+              '<div class="card-poster">' + posterHtml + '</div>' +
+              '<div class="card-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>' +
+              '<div class="card-info">' +
+                '<div class="card-title">' + name + '</div>' +
+                (metaHtml ? '<div class="card-meta">' + metaHtml + '</div>' : '') +
+              '</div>' +
+            '</div>';
+          }).join('');
+          
+          streamsGrid.querySelectorAll('.card').forEach(function(el) {
+            el.addEventListener('click', function() {
+              playStream(el.getAttribute('data-id'), el.getAttribute('data-name'));
+            });
+          });
+          
+          log('Rendered ' + data.length + ' streams');
+        });
+      }
+      
+      function playStream(id, name) {
+        log('Play clicked: ' + name + ' (type: ' + currentType + ')');
+        
+        // For series, we need to show episodes first
+        if (currentType === 'series') {
+          loadSeriesEpisodes(id, name);
+          return;
+        }
+        
+        // For live and vod, play directly
+        var ext = currentType === 'live' ? 'ts' : 'm3u8';
+        var streamType = currentType === 'live' ? 'live' : 'movie';
+        var url = config.server + '/' + streamType + '/' + config.username + '/' + config.password + '/' + id + '.' + ext;
+        
+        log('Playing URL: ' + url);
+        
+        if (typeof iina !== 'undefined' && iina.postMessage) {
+          iina.postMessage('play', { url: url, name: name, type: currentType, id: id });
+        }
+      }
+      
+      // Series-specific: load episodes for a series
+      var currentSeriesId = null;
+      var currentSeriesName = null;
+      
+      function loadSeriesEpisodes(seriesId, seriesName) {
+        log('Loading series info: ' + seriesName);
+        showLoading();
+        currentSeriesId = seriesId;
+        currentSeriesName = seriesName;
+        
+        apiRequest('get_series_info', { series_id: seriesId }, function(err, data) {
+          hideLoading();
+          
+          if (err || !data) {
+            showEmpty('Erreur lors du chargement de la série');
+            return;
+          }
+          
+          // data.episodes is an object with season numbers as keys
+          var episodes = data.episodes || {};
+          var allEpisodes = [];
+          
+          // Flatten all episodes from all seasons
+          for (var season in episodes) {
+            if (episodes.hasOwnProperty(season)) {
+              var seasonEps = episodes[season];
+              if (Array.isArray(seasonEps)) {
+                seasonEps.forEach(function(ep) {
+                  ep.season_num = season;
+                  allEpisodes.push(ep);
+                });
+              }
+            }
+          }
+          
+          if (allEpisodes.length === 0) {
+            showEmpty('Aucun épisode trouvé');
+            return;
+          }
+          
+          showStreams(seriesName + ' - Épisodes');
+          
+          streamsGrid.innerHTML = allEpisodes.map(function(ep) {
+            var title = ep.title || ('Épisode ' + (ep.episode_num || '?'));
+            var seasonEp = 'S' + (ep.season_num || '?') + 'E' + (ep.episode_num || '?');
+            var poster = ep.info && ep.info.movie_image ? ep.info.movie_image : (data.info && data.info.cover ? data.info.cover : '');
+            var epId = ep.id;
+            var container = ep.container_extension || 'mkv';
+            
+            var posterHtml = poster 
+              ? '<img src="' + poster + '" loading="lazy" onerror="this.outerHTML=\'<div class=placeholder>📺</div>\'">'
+              : '<div class="placeholder">📺</div>';
+            
+            return '<div class="card" data-id="' + epId + '" data-ext="' + container + '" data-name="' + title.replace(/"/g, '&quot;') + '">' +
+              '<div class="card-poster">' + posterHtml + '</div>' +
+              '<div class="card-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>' +
+              '<div class="card-info">' +
+                '<div class="card-title">' + title + '</div>' +
+                '<div class="card-meta">' + seasonEp + '</div>' +
+              '</div>' +
+            '</div>';
+          }).join('');
+          
+          streamsGrid.querySelectorAll('.card').forEach(function(el) {
+            el.addEventListener('click', function() {
+              var epId = el.getAttribute('data-id');
+              var epName = el.getAttribute('data-name');
+              var ext = el.getAttribute('data-ext') || 'mkv';
+              playEpisode(epId, epName, ext);
+            });
+          });
+          
+          log('Rendered ' + allEpisodes.length + ' episodes');
+        });
+      }
+      
+      function playEpisode(episodeId, episodeName, extension) {
+        log('Playing episode: ' + episodeName);
+        
+        // Episode URL format: /series/username/password/episodeId.ext
+        var url = config.server + '/series/' + config.username + '/' + config.password + '/' + episodeId + '.' + extension;
+        
+        log('Episode URL: ' + url);
+        
+        if (typeof iina !== 'undefined' && iina.postMessage) {
+          iina.postMessage('play', { url: url, name: episodeName, type: 'episode', id: episodeId });
+        }
+      }
+      
+      // ========== EVENT HANDLERS ==========
+      backBtn.addEventListener('click', function() { loadCategories(); });
+      
+      settingsBtn.addEventListener('click', function() { showConnectionView(); });
+      
+      tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          tabs.forEach(function(t) { t.classList.remove('active'); });
+          tab.classList.add('active');
+          currentType = tab.getAttribute('data-type');
+          loadCategories();
+        });
+      });
+      
+      // ========== IINA MESSAGE HANDLERS ==========
+      if (typeof iina !== 'undefined' && iina.onMessage) {
+        iina.onMessage('init', function(data) {
+          log('Init received');
+          if (data) {
+            if (data.server) {
+              config.server = data.server;
+              config.username = data.username;
+              config.password = data.password;
+              serverInput.value = data.server;
+              usernameInput.value = data.username;
+              passwordInput.value = data.password;
+              
+              // If already configured, switch to browser
+              if (data.autoConnect) {
+                showBrowserView();
+              }
+            }
+          }
+        });
+        
+        iina.onMessage('error', function(data) {
+          if (currentView === 'connection') {
+            errorMsg.textContent = data.message || 'Erreur';
+            errorMsg.classList.remove('hidden');
+            connectBtn.disabled = false;
+            connectBtn.textContent = 'Connect';
+          } else {
+            showEmpty(data.message || 'Erreur');
+          }
+        });
+        
+        // HTTP Proxy for ATS bypass
+        iina.onMessage('api_request', function(data) {
+          fetch(data.url, { method: 'GET', headers: { 'Accept': 'application/json' } })
+            .then(function(res) {
+              return res.text().then(function(text) {
+                return { statusCode: res.status, text: text };
+              });
+            })
+            .then(function(result) {
+              iina.postMessage('api_response', {
+                requestId: data.requestId,
+                success: true,
+                statusCode: result.statusCode,
+                text: result.text
+              });
+            })
+            .catch(function(err) {
+              iina.postMessage('api_response', {
+                requestId: data.requestId,
+                success: false,
+                error: err.message
+              });
+            });
+        });
+      }
+      
+      // ========== INIT ==========
+      log('Window loaded, sending ready signal');
+      if (typeof iina !== 'undefined' && iina.postMessage) {
+        iina.postMessage('ready', {});
+      }
+    })();
+  </script>
+</body>
+</html>

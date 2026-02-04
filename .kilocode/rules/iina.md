@@ -1,34 +1,28 @@
-# IINA Plugin System Instructions (2026)
+# IINA Plugin System Instructions (2026 - IINA 1.4.1)
+
+> **Last Updated**: February 2026  
+> **IINA Version**: 1.4.1  
+> **Docs**: [iina.io/plugin/documentation](https://iina.io/plugin/documentation/)
 
 ## 1. Critical Architecture & Constraints
 
-- **Runtime Environment**: Plugins run in a limited JavaScript environment.
-  - **NO** full Node.js API (no `fs`, `net`, `http` servers).
-  - **NO** Browser globals in the main process (no `window`, `document`, `fetch`, `localStorage`).
-- **UI Isolation**: GUI elements (Standalone Window, Sidebar, Overlay) run in **separate WebViews**.
-  - They **cannot** access the plugin's variables directly.
-  - Communication is strictly asynchronous via `postMessage`.
-- **Dependency Management**:
-  - **MANDATORY**: Use a Bundler (Parcel/Webpack) to use NPM packages.
-  - The raw runtime does not resolve `node_modules` hierarchically.
+- **Runtime**: JavaScriptCore (Safari engine), supports **ES2015 (ES6)** on macOS 10.11+.
+  - **NO** Node.js API (`fs`, `net`, `http` servers).
+  - **NO** Browser globals (`window`, `document`, `fetch`, `localStorage`).
+- **UI Isolation**: WebViews (Sidebar, Overlay, Window) cannot access plugin variables. Use `postMessage`/`onMessage`.
+- **Dependencies**: **MANDATORY** bundler (Parcel/Webpack) for NPM packages.
 
 ## 2. Project Structure
-
-Standard layout for a modern, production-ready plugin:
 
 ```
 Author.PluginName/
 ├── Info.json          # Manifest (Required)
 ├── Preferences.xib    # Native UI (Optional)
-├── package.json       # Dev dependencies (Parcel, TypeScript)
-├── dist/              # Bundled output
-│   ├── main.js        # Per-window entry point
-│   └── global.js      # Global entry point (optional)
+├── package.json
+├── dist/
+│   ├── main.js        # Per-window entry
+│   └── global.js      # App-level entry (optional)
 └── src/
-    ├── main.ts        # Entry source
-    ├── global.ts      # Global source
-    ├── ui/            # React/Vue components for WebViews
-    └── assets/
 ```
 
 ### Info.json Schema
@@ -38,32 +32,34 @@ Author.PluginName/
   "name": "Plugin Name",
   "identifier": "com.author.pluginname",
   "version": "1.0.0",
+  "author": "Author Name",
   "ghRepo": "author/repo",
   "ghVersion": "1.0.0",
   "entry": "dist/main.js",
   "globalEntry": "dist/global.js",
-  "preferencePages": [
-    { "id": "general", "title": "General", "xib": "Preferences.xib" }
-  ],
   "permissions": [
-    "network",
-    "file-system",
-    "standalone-window",
-    "show-overlay",
+    "show-osd",
     "show-alert",
-    "menu",
-    "preferences",
-    "playlist",
-    "sidebar"
+    "video-overlay",
+    "network-request",
+    "file-system"
   ]
 }
 ```
 
-## 3. Build Configuration & Tooling
+### Permissions Reference
 
-### Critical `package.json` Configuration (Parcel)
+| Permission        | Required For                            |
+| ----------------- | --------------------------------------- |
+| `show-osd`        | `iina.core.osd()`                       |
+| `show-alert`      | `iina.utils` alert/dialog methods       |
+| `video-overlay`   | `iina.overlay` module                   |
+| `network-request` | `iina.http` module                      |
+| `file-system`     | `iina.file` module, `iina.utils.exec()` |
 
-To ensure compatibility with IINA's runtime (CommonJS), configure targets specifically:
+## 3. Build Configuration
+
+### package.json (Parcel)
 
 ```json
 {
@@ -86,190 +82,292 @@ To ensure compatibility with IINA's runtime (CommonJS), configure targets specif
 }
 ```
 
-### TypeScript Setup
+### CLI Tool
 
-1. Install types: `npm install --save-dev iina-plugin-definition`
-2. Create `tsconfig.json` (or `jsconfig.json`):
-   ```json
-   {
-     "compilerOptions": { "target": "ES6", "moduleResolution": "node" },
-     "include": ["src/**/*"]
-   }
-   ```
+```bash
+npx iina-plugin create my-plugin  # Create new plugin
+npx iina-plugin pack              # Pack for distribution (.iinaplgz)
+```
 
 ### Debugging
 
-- Enable **Safari Developer Menu**: Preferences > Advanced > Show Develop menu.
-- Open Inspector: **Develop > IINA > [Plugin Name]**.
-- Use `iina.console.log` to see output in the inspector console.
+- Safari: **Develop > IINA > [Plugin Name]**
+- Use `iina.console.log` for output.
 
 ## 4. Core API Reference (`iina.*`)
 
-Use these modules instead of standard JS/Node APIs.
+```javascript
+const { core, event, mpv, console } = iina;
+```
 
-### `iina.core` & `iina.mpv` (Playback)
+### `iina.core` (Playback)
+
+Sub-modules: `core.audio`, `core.video`, `core.subtitle`, `core.window`, `core.status`
 
 ```javascript
-// Controls
 iina.core.open("url");
-iina.core.iosd("Message"); // Interactive OSD
+iina.core.osd("Message"); // Requires 'show-osd'
+iina.core.pause();
+iina.core.resume();
+iina.core.stop();
+iina.core.seek(10, true); // Relative seek (exact=true)
+iina.core.seekTo(120); // Absolute seek
+iina.core.setSpeed(1.5);
+iina.core.getChapters();
+iina.core.playChapter(2);
 
-// mpv direct access
-iina.mpv.set("volume", 50);
-const pos = iina.mpv.getNumber("time-pos");
+// Window control
+iina.core.window.loaded; // Check if ready
+iina.core.window.fullscreen = true;
+iina.core.window.pip = true;
+iina.core.window.ontop = true;
+
+// Status
+iina.core.status.paused;
+iina.core.status.title;
+iina.core.status.duration;
+```
+
+### `iina.mpv` (MPV Direct)
+
+```javascript
+iina.mpv.getNumber("volume");
+iina.mpv.getFlag("pause");
+iina.mpv.getString("filename");
+iina.mpv.set("volume", 80);
 iina.mpv.command("seek", ["10", "relative"]);
+iina.mpv.addHook("on_load", 50, () => {
+  /* ... */
+});
 ```
 
 ### `iina.event` (Events)
 
 ```javascript
 // IINA Events
-iina.event.on("iina.file-loaded", () => {
-  console.log(iina.core.file);
-});
-iina.event.on("iina.window-will-close", () => cleanup());
+iina.event.on("iina.file-loaded", () => {});
+iina.event.on("iina.window-will-close", () => {});
+iina.event.on("iina.pip.changed", (inPIP) => {});
 
-// MPV Events
-iina.event.on("mpv.pause", () => handlePause());
-iina.event.on("mpv.time-pos.changed", (v) => updateUI(v));
+// MPV Property Changes
+iina.event.on("mpv.pause.changed", (isPaused) => {});
+iina.event.on("mpv.time-pos.changed", (pos) => {});
+iina.event.on("mpv.volume.changed", (vol) => {});
 ```
 
 ### `iina.http` (Networking)
 
-**MANDATORY: Use `iina.http` instead of external commands like `curl`.**
+**Requires**: `network-request` permission. **MANDATORY: Use instead of curl/fetch.**
 
 ```javascript
-// GET
-iina.http.get("https://api.com", { timeout: 5000 }, (err, res) => {
-  if (err) return Logger.error(err.message);
+iina.http.get("url", { timeout: 5000, headers: {} }, (err, res) => {
+  if (err) return;
   const data = JSON.parse(res.text);
 });
 
-// POST
 iina.http.post(
-  "https://api.com",
-  {
-    body: JSON.stringify({ foo: "bar" }),
-    headers: { "Content-Type": "application/json" },
-  },
+  "url",
+  { body: JSON.stringify({}), headers: { "Content-Type": "application/json" } },
   callback,
 );
+
+iina.http.download("url", "/path/to/file", (err) => {});
+
+const xmlrpc = new iina.http.XMLRPCClient("url");
+xmlrpc.call("method", [args], (err, result) => {});
 ```
 
-**Do NOT use:**
-- ❌ `iina.utils.exec('/usr/bin/curl', ...)` - Fragile and platform-dependent
-- ❌ `fetch` - Not available in plugin context
-- ❌ External HTTP libraries - Not compatible with IINA runtime
-
-### `iina.preferences` (Storage)
-
-```javascript
-// Persist user settings
-iina.preferences.set("token", "12345");
-const token = iina.preferences.get("token");
-iina.preferences.sync(); // Force save
-```
-
-### `iina.menu` & `iina.sidebar` (System UI)
-
-```javascript
-// Menu Item
-iina.menu.addItem(
-  iina.menu.item(
-    "My Action",
-    () => {
-      iina.console.log("Clicked");
-    },
-    { key: "d", modifiers: ["cmd"] },
-  ),
-);
-
-// Sidebar Tab
-iina.sidebar.create({
-  tabId: "my-tab",
-  html: "dist/ui/sidebar.html", // bundled HTML
-  onMessage: (msg) => handleSidebarMsg(msg),
-});
-```
-
-### `iina.standaloneWindow` & `iina.overlay` (Custom UI)
-
-```javascript
-// Standalone Window
-const win = iina.standaloneWindow.open({
-  title: "Title",
-  width: 400,
-  height: 300,
-  resizable: true,
-  onMessage: (msg, data) => processAction(msg, data),
-});
-win.loadFile("dist/ui/index.html");
-win.simpleMode(); // Removes chrome
-win.postMessage("UPDATE", { payload: 123 });
-
-// Overlay (OSD-like HTML)
-iina.overlay.show({
-  html: "<div>Hello</div>",
-  position: "center",
-});
-```
-
-### `iina.playlist` & `iina.file`
-
-```javascript
-// Playlist
-iina.playlist.add("url", "Title");
-iina.playlist.playAt(0);
-
-// File System (Limited, use absolute paths)
-// Returns Promise
-const content = await iina.file.read("/absolute/path");
-await iina.file.write("/absolute/path", "content");
-```
+❌ **Forbidden**: `iina.utils.exec('/usr/bin/curl', ...)`, `fetch`, external HTTP libraries
 
 ### `iina.ws` (WebSockets)
 
 ```javascript
-const ws = new iina.ws("wss://echo.websocket.org");
+const ws = new iina.ws("wss://...");
 ws.onopen = () => ws.send("Hello");
-ws.onmessage = (e) => iina.console.log(e.data);
+ws.onmessage = (e) => console.log(e.data);
+ws.onerror = (e) => {};
+ws.onclose = () => {};
+ws.close();
 ```
 
-### `iina.global` (Instance Management)
+### `iina.file` (File System)
 
-**Only available in `global.js`.**
+**Requires**: `file-system` permission. **Always use absolute paths.**
 
 ```javascript
-const player = iina.global.newWindow({ disableUI: false });
-player.open("https://video.mp4");
-player.postMessage("cmd", { a: 1 });
+const content = await iina.file.read("/path");
+await iina.file.write("/path", "content");
+const exists = await iina.file.exists("/path");
+const files = await iina.file.list("/path");
 ```
 
-## 5. UI Communication Pattern
+### `iina.utils` (Utilities)
 
-**In `main.js` (Plugin Process)**:
+**Requires**: `file-system` for `exec()`, `show-alert` for dialogs.
 
 ```javascript
-window.onMessage = (msg, data) => handle(data);
-window.postMessage("update", state);
+iina.utils.exec("/usr/bin/cmd", ["args"], (err, stdout, stderr) => {});
+iina.utils.showAlert("Title", "Msg", ["OK", "Cancel"], (idx) => {});
+iina.utils.chooseFile(["mp4", "mkv"], (path) => {});
+iina.utils.chooseFolder((path) => {});
 ```
 
-**In `index.html` (WebView Process)**:
+### `iina.preferences` (Storage)
 
 ```javascript
-// Send to Main
-iina.postMessage("action", { id: 1 });
+iina.preferences.set("key", value);
+const val = iina.preferences.get("key");
+iina.preferences.sync();
+```
 
-// Receive from Main
-iina.onMessage("update", (data) => {
-  render(data.payload);
+### `iina.console` (Logging)
+
+```javascript
+iina.console.log("info");
+iina.console.warn("warning");
+iina.console.error("error");
+```
+
+### `iina.menu` (Menu Items)
+
+```javascript
+iina.menu.addItem(
+  iina.menu.item("Action", () => {}, { key: "d", modifiers: ["cmd"] }),
+);
+iina.menu.addItem(iina.menu.separator());
+const submenu = iina.menu.createSubmenu("Submenu");
+submenu.addItem(iina.menu.item("Item", () => {}));
+iina.menu.addItem(submenu);
+```
+
+### `iina.playlist` (Playlist)
+
+```javascript
+iina.playlist.add("url", "Title");
+const items = iina.playlist.getItems();
+iina.playlist.playAt(0);
+iina.playlist.remove(2);
+iina.playlist.clear();
+```
+
+### `iina.subtitle` (Subtitle Provider)
+
+```javascript
+iina.subtitle.register({
+  name: "Provider Name",
+  id: "provider-id",
+  search: async () =>
+    results.map((s) => iina.subtitle.item(s, { title, language })),
+  description: (item) => [
+    item.data.title,
+    item.data.language,
+    item.data.source,
+  ],
+  download: async (item) => [downloadedPath],
 });
 ```
 
-## 6. Development Checklist
+### `iina.input` (Input Capture)
 
-- [ ] **Permissions**: Are used APIs declared in `Info.json`?
-- [ ] **Entry Points**: `main.js` (per-window) vs `global.js` (app-level).
-- [ ] **Paths**: Are you using absolute paths? (use `__dirname` logic or `iina.utils`).
-- [ ] **Logging**: Use `iina.console.log`.
-- [ ] **Error Handling**: Check `err` in callbacks.
+**Main entry only.**
+
+```javascript
+iina.input.onKeyDown((e) => {
+  if (e.key === "l" && e.modifiers.includes("cmd")) {
+    return true;
+  } // handled
+  return false;
+}, iina.input.PRIORITY_LOW);
+
+iina.input.onMouseDown((e) => {
+  console.log(e.x, e.y);
+  return false;
+});
+```
+
+## 5. UI Modules (WebView-based)
+
+### `iina.overlay` (Video Overlay)
+
+**Requires**: `video-overlay` permission
+
+```javascript
+iina.overlay.simpleMode();
+iina.overlay.setContent("<div>...</div>");
+iina.overlay.setStyle("div { color: white; }");
+iina.overlay.loadFile("dist/ui/overlay.html");
+iina.overlay.show();
+iina.overlay.hide();
+iina.overlay.setOpacity(0.8);
+iina.overlay.setClickable(true);
+iina.overlay.postMessage({ type: "update" });
+iina.overlay.onMessage((msg) => {});
+```
+
+### `iina.standaloneWindow` (Separate Window)
+
+```javascript
+const win = iina.standaloneWindow.open();
+win.setProperty("title", "Title");
+win.setFrame({ x: 100, y: 100, width: 400, height: 300 });
+win.loadFile("dist/ui/window.html");
+win.simpleMode();
+win.setContent("<div>...</div>");
+win.postMessage({ action: "refresh" });
+win.onMessage((msg) => {});
+win.close();
+```
+
+### `iina.sidebar` (Sidebar Tab)
+
+```javascript
+iina.sidebar.create({
+  tabId: "my-tab",
+  title: "Title",
+  html: "dist/ui/sidebar.html",
+  onMessage: (msg) => {},
+});
+iina.sidebar.postMessage("my-tab", { type: "update" });
+```
+
+### WebView JavaScript (Inside HTML)
+
+```javascript
+iina.postMessage({ action: "clicked" });
+iina.onMessage("update", (data) => {});
+```
+
+## 6. Global Entry (`iina.global`)
+
+**Only in `global.js`** (specified by `globalEntry`).
+
+```javascript
+const player = iina.global.newWindow({ disableUI: false });
+player.open("url");
+player.pause();
+player.resume();
+player.seek(30);
+player.postMessage("cmd", {});
+player.onMessage((msg) => {});
+
+iina.global.onNewWindow((window) => {});
+```
+
+## 7. Distribution
+
+```bash
+npx iina-plugin pack  # Creates PluginName.iinaplgz
+```
+
+- Install: Double-click `.iinaplgz` or via IINA plugin manager
+- Auto-updates: Set `ghRepo` and `ghVersion` in Info.json
+
+## 8. Checklist
+
+- [ ] Permissions declared in `Info.json`
+- [ ] Using `iina.http` (NOT curl/fetch)
+- [ ] Using `iina.console.log` (NOT console.log)
+- [ ] Using absolute paths
+- [ ] Checking `err` in callbacks
+- [ ] Using `postMessage`/`onMessage` for WebView
+- [ ] Bundled with CommonJS output

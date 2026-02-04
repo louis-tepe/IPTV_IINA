@@ -1,5 +1,5 @@
 /* IINA IPTV Plugin - Shared Styles */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
 :root {
   /* Colors - Dark Theme (Premium) */
@@ -47,31 +47,52 @@
 
 /* Animations */
 @keyframes fadeSlideUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Reset */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
 }
 
-html, body {
+html,
+body {
   width: 100%;
   height: 100%;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "Helvetica Neue",
+    sans-serif;
   font-size: 13px;
   line-height: 1.4;
   color: var(--text-primary);
@@ -313,7 +334,9 @@ input::placeholder {
 }
 
 /* States */
-.loading, .empty, .error-state {
+.loading,
+.empty,
+.error-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -374,13 +397,17 @@ input::placeholder {
 }
 
 .category-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    transparent 100%
+  );
   opacity: 0.5;
   transition: opacity var(--transition-normal);
 }
@@ -407,7 +434,7 @@ input::placeholder {
   color: var(--accent);
   margin-bottom: var(--spacing-md);
   transition: transform 0.2s ease;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .category-card:hover .category-icon {
@@ -748,10 +775,10 @@ input::placeholder {
 }
 
 .connection-screen .btn-primary.loading .btn-loading::before {
-  content: '';
+  content: "";
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255,255,255,0.3);
+  border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -905,7 +932,7 @@ input::placeholder {
   right: 0;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
-  font-family: 'SF Mono', Monaco, monospace;
+  font-family: "SF Mono", Monaco, monospace;
   font-size: 11px;
   z-index: 1000;
   max-height: 200px;
@@ -1030,3 +1057,311 @@ input::placeholder {
   color: var(--accent, #8b5cf6);
 }
 
+/* ================================
+   MOVIE DETAILS MODAL
+   ================================ */
+.movie-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.movie-modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.movie-modal {
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+  transform: scale(0.95) translateY(20px);
+  transition: transform 0.3s ease;
+}
+
+.movie-modal-overlay.active .movie-modal {
+  transform: scale(1) translateY(0);
+}
+
+.movie-modal-header {
+  position: relative;
+  aspect-ratio: 21/9;
+  background-size: cover;
+  background-position: center top;
+  flex-shrink: 0;
+}
+
+.movie-modal-header::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, var(--bg-primary) 0%, transparent 100%);
+}
+
+.movie-modal-close {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  width: 36px;
+  height: 36px;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.2s ease;
+}
+
+.movie-modal-close:hover {
+  background: var(--accent);
+  transform: scale(1.1);
+}
+
+.movie-modal-content {
+  padding: var(--spacing-xl);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.movie-modal-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: var(--spacing-md);
+}
+
+.movie-modal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.movie-modal-badge {
+  padding: 4px 12px;
+  background: var(--accent-light);
+  color: var(--accent);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.movie-modal-badge.rating {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+}
+
+.movie-modal-synopsis {
+  color: var(--text-secondary);
+  line-height: 1.7;
+  font-size: 14px;
+  margin-bottom: var(--spacing-lg);
+}
+
+.movie-modal-actions {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.movie-modal-play {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-xl);
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.movie-modal-play:hover {
+  background: var(--accent-hover);
+  transform: translateY(-2px);
+}
+
+/* ================================
+   PROGRESS INDICATORS
+   ================================ */
+.stream-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.stream-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.history-progress {
+  margin-top: var(--spacing-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.history-progress-container {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.history-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.history-progress-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* Stream duration badge */
+.stream-duration {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
+/* ================================
+   ENHANCED FOCUS STATES
+   ================================ */
+.stream-card:focus-visible,
+.category-card:focus-visible,
+.history-card:focus-visible,
+.episode-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tab:focus-visible,
+.btn:focus-visible,
+.btn-icon:focus-visible,
+.season-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Keyboard navigation mode */
+body.keyboard-nav *:focus {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+
+/* ================================
+   MICRO-ANIMATIONS
+   ================================ */
+@keyframes heartPop {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.3);
+  }
+  50% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.btn-favorite.animating svg,
+.stream-favorite.animating svg {
+  animation: heartPop 0.4s ease;
+}
+
+.stream-favorite.active svg {
+  fill: var(--danger);
+  color: var(--danger);
+}
+
+/* Episode hover enhancement */
+.episode-card {
+  transition: all 0.2s ease;
+}
+
+.episode-card:hover {
+  background: var(--bg-hover);
+  transform: translateX(4px);
+}
+
+/* Card appear animation */
+.stream-card,
+.category-card {
+  animation: fadeSlideUp 0.3s ease backwards;
+}
+
+/* Stagger animation for grid items */
+.content-grid > *:nth-child(1) {
+  animation-delay: 0s;
+}
+.content-grid > *:nth-child(2) {
+  animation-delay: 0.02s;
+}
+.content-grid > *:nth-child(3) {
+  animation-delay: 0.04s;
+}
+.content-grid > *:nth-child(4) {
+  animation-delay: 0.06s;
+}
+.content-grid > *:nth-child(5) {
+  animation-delay: 0.08s;
+}
+.content-grid > *:nth-child(6) {
+  animation-delay: 0.1s;
+}
+.content-grid > *:nth-child(7) {
+  animation-delay: 0.12s;
+}
+.content-grid > *:nth-child(8) {
+  animation-delay: 0.14s;
+}
+
+/* Screen reader only (for aria-live) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

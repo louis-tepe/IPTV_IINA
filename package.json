@@ -1,12 +1,13 @@
 {
   "name": "iptv-inna-plugin",
-  "version": "8.0.0",
+  "version": "8.0.2",
   "description": "IPTV Player for IINA - Modernized architecture with centralized logging, i18n, and simplified build system",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "parcel watch --target main --target global --target browser --no-hmr",
-    "build": "parcel build --target main --target global --target browser",
-    "clean": "rm -rf dist .parcel-cache"
+    "dev": "parcel watch --target main --target global --no-hmr",
+    "build": "parcel build --target main --target global",
+    "clean": "rm -rf dist .parcel-cache",
+    "install-plugin": "./install.sh"
   },
   "targets": {
     "main": {
@@ -22,17 +23,11 @@
       "includeNodeModules": true,
       "context": "node",
       "outputFormat": "commonjs"
-    },
-    "browser": {
-      "source": "browser.js",
-      "distDir": "./",
-      "includeNodeModules": true,
-      "context": "browser",
-      "outputFormat": "commonjs"
     }
   },
   "devDependencies": {
-    "parcel": "^2.11.0"
+    "parcel": "^2.11.0",
+    "iina-plugin-definition": "latest"
   },
   "keywords": [
     "iina",

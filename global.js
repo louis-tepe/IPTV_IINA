@@ -1,616 +1,478 @@
 /**
- * IINA IPTV Plugin - Global Entry Point (Refactored)
- * v8.0.0 - Modular Architecture
- * 
- * Refactored from monolithic 2674 lines to modular structure
- * @author IPTV Plugin Developer
- * @version 8.0.0
+ * IINA IPTV Plugin - Global Entry Point (Menu-based UI)
+ * Works with IINA 1.4.1 - No window/sidebar APIs available
+ * Uses menu-based interface with console output
  */
 
 'use strict';
 
-// ============================================
-// MODULE IMPORTS
-// ============================================
+iina.console.log('[IPTV Global] Plugin loaded - Menu-based interface');
 
-var stateModule = require('./src/core/state');
-var i18n = require('./src/core/i18n');
-var helpers = require('./src/utils/helpers');
-var storage = require('./src/managers/storage');
-var cache = require('./src/managers/cache');
-var xtream = require('./src/api/xtream');
-var search = require('./src/managers/search');
+// ============================================================================
+// Configuration & State
+// ============================================================================
 
-// ============================================
-// EXPORTS FROM MODULES
-// ============================================
+var CONFIG = {
+  server: '',
+  username: '',
+  password: ''
+};
 
-var DEBUG = stateModule.DEBUG;
-var LOG_PREFIX = stateModule.LOG_PREFIX;
-var PLUGIN_VERSION = stateModule.PLUGIN_VERSION;
-var XtreamAPI = xtream.XtreamAPI;
-var withTimeout = helpers.withTimeout;
+var STATE = {
+  categories: { live: [], vod: [], series: [] },
+  streams: { live: {}, vod: {}, series: {} },
+  currentCategory: null
+};
 
-var state = stateModule.state;
-var messageHandlersSetup = stateModule.messageHandlersSetup;
+// ============================================================================
+// Utility Functions
+// ============================================================================
 
-var loadCredentials = storage.loadCredentials;
-var saveCredentials = storage.saveCredentials;
-var clearCredentials = storage.clearCredentials;
-var loadFavorites = storage.loadFavorites;
-var saveFavorites = storage.saveFavorites;
-var loadHistory = storage.loadHistory;
-var updateResumePosition = storage.updateResumePosition;
-var getResumePosition = storage.getResumePosition;
-
-var isCacheValid = cache.isCacheValid;
-var getStreamCacheKey = cache.getStreamCacheKey;
-var updateCache = cache.updateCache;
-var deduplicateRequest = cache.deduplicateRequest;
-var preloadVodCategories = cache.preloadVodCategories;
-var preloadSeriesCategories = cache.preloadSeriesCategories;
-var backgroundCacheRefresh = cache.backgroundCacheRefresh;
-var saveCache = cache.saveCache;
-var restoreCache = cache.restoreCache;
-var clearCache = cache.clearCache;
-var VIRTUAL_SCROLL_THRESHOLD = cache.VIRTUAL_SCROLL_THRESHOLD;
-var VIRTUAL_ITEM_HEIGHT = cache.VIRTUAL_ITEM_HEIGHT;
-
-// ============================================
-// IINA MODULE ALIASES
-// ============================================
-
-var win = iina.standaloneWindow;
-var prefs = iina.preferences;
-var menu = iina.menu;
-
-// Always log startup
-iina.console.log('[IPTV] Plugin v' + PLUGIN_VERSION + ' loaded (modular)');
-
-// ============================================
-// LOGGING SYSTEM
-// ============================================
-
-function log(msg) {
-  if (!DEBUG) return;
-  var m = LOG_PREFIX + ' ' + msg;
-  iina.console.log(m);
-  if (win && typeof win.postMessage === 'function') {
-    try { win.postMessage('log', m); } catch (e) {}
-  }
-}
-
-function logError(msg) {
-  var m = LOG_PREFIX + ' ERROR: ' + msg;
-  iina.console.error(m);
-  if (DEBUG && win && typeof win.postMessage === 'function') {
-    try { win.postMessage('log', '❌ ' + m); } catch (e) {}
-  }
-}
-
-// ============================================
-// GLOBAL ERROR HANDLERS
-// ============================================
-
-if (typeof process !== 'undefined' && process.on) {
-  process.on('unhandledRejection', function(reason) {
-    var errorMsg = 'Unhandled Promise Rejection: ' + (reason && reason.message ? reason.message : String(reason));
-    logError(errorMsg);
-    try { if (win) win.postMessage('error', 'Internal error: ' + errorMsg); } catch (e) {}
-  });
-  
-  process.on('uncaughtException', function(error) {
-    logError('UNCAUGHT EXCEPTION: ' + error.message);
-    try { if (win) win.postMessage('error', 'Critical error: ' + error.message); } catch (e) {}
-  });
-}
-
-// ============================================
-// RESUME POSITION SYNC (Event-Driven)
-// ============================================
-
-// Listen for position updates from main.js
-iina.event.on('iptv.resumePositionUpdated', async function(data) {
+function loadConfig() {
   try {
-    if (data && data.streamId && data.position > 0) {
-      state.resumePositions[String(data.streamId)] = {
-        position: data.position,
-        duration: data.duration || 0,
-        updatedAt: data.updatedAt || Date.now()
-      };
-      await storage.saveResumePositions();
-      if (DEBUG) log('[Resume Position] Updated for stream ' + data.streamId + ': ' + data.position + 's');
+    var saved = iina.preferences.get('iptv_config');
+    if (saved) {
+      CONFIG = JSON.parse(saved);
+      iina.console.log('[IPTV Global] Configuration loaded');
     }
   } catch (e) {
-    logError('[Resume Position] Failed to update: ' + e.message);
+    iina.console.error('[IPTV Global] Failed to load config: ' + e.message);
+  }
+}
+
+function saveConfig() {
+  try {
+    iina.preferences.set('iptv_config', JSON.stringify(CONFIG));
+    // Sync to disk immediately for persistence
+    if (typeof iina.preferences.sync === 'function') {
+      iina.preferences.sync();
+    }
+    iina.console.log('[IPTV Global] Configuration saved and synced');
+  } catch (e) {
+    iina.console.error('[IPTV Global] Failed to save config: ' + e.message);
+  }
+}
+
+function buildApiUrl(action, params) {
+  if (!CONFIG.server || !CONFIG.username || !CONFIG.password) {
+    return null;
+  }
+  
+  // Keep HTTP - requests go through WebView which allows insecure connections
+  var server = CONFIG.server;
+  
+  var url = server + '/player_api.php?username=' + CONFIG.username + '&password=' + CONFIG.password;
+  if (action) url += '&action=' + action;
+  if (params) {
+    for (var k in params) {
+      url += '&' + k + '=' + encodeURIComponent(params[k]);
+    }
+  }
+  return url;
+}
+
+// ============================================================================
+// API Request (WebView Proxy for ATS bypass)
+// ============================================================================
+// iina.http is blocked by macOS App Transport Security for HTTP (non-HTTPS)
+// URLs. WebViews can bypass ATS, so we route requests through the connection
+// window's JavaScript context which has access to fetch() without ATS blocking.
+
+var pendingRequests = {};
+var requestIdCounter = 0;
+
+function apiRequest(action, params, callback) {
+  var url = buildApiUrl(action, params);
+  if (!url) {
+    callback(new Error('Not configured - Please set credentials first'));
+    return;
+  }
+  
+  iina.console.log('[IPTV API] Request: ' + (action || 'user_info'));
+  iina.console.log('[IPTV API] URL: ' + url.replace(/password=[^&]+/, 'password=***'));
+  iina.console.log('[IPTV API] Routing through WebView proxy (ATS bypass)');
+  
+  // Generate unique request ID
+  var requestId = 'req_' + (++requestIdCounter) + '_' + Date.now();
+  pendingRequests[requestId] = callback;
+  
+  // Send request through WebView (which can make HTTP requests without ATS blocking)
+  iina.standaloneWindow.postMessage('api_request', {
+    requestId: requestId,
+    url: url
+  });
+  
+  // Timeout after 30 seconds
+  setTimeout(function() {
+    if (pendingRequests[requestId]) {
+      iina.console.error('[IPTV API] Request timeout after 30s');
+      delete pendingRequests[requestId];
+      callback(new Error('Request timeout - server did not respond'));
+    }
+  }, 30000);
+}
+
+function getStreamUrl(id, type, ext) {
+  ext = ext || 'ts';
+  return CONFIG.server + '/' + type + '/' + CONFIG.username + '/' + CONFIG.password + '/' + id + '.' + ext;
+}
+
+function triggerPlayback(url, name, type, streamId) {
+  var playRequest = {
+    url: url,
+    name: name,
+    type: type,
+    streamId: streamId,
+    timestamp: Date.now()
+  };
+  
+  // Use preferences-based communication (works in IINA 1.4.1)
+  iina.preferences.set('iptv_play_request', JSON.stringify(playRequest));
+  iina.console.log('[IPTV Global] Playing: ' + name);
+}
+
+// ============================================================================
+// Window Management (Single main.html handles both connection and browser views)
+// ============================================================================
+
+var windowReady = false;
+
+// Load main HTML at plugin init (IINA pattern - load ONCE, never switch)
+iina.standaloneWindow.loadFile('ui/main.html');
+iina.console.log('[IPTV Global] Main HTML pre-loaded');
+
+function openMainWindow(autoConnect) {
+  iina.console.log('[IPTV Global] Opening main window...');
+  iina.standaloneWindow.setProperty('title', 'IPTV Player');
+  iina.standaloneWindow.open();
+  
+  // Send init with config after a short delay
+  setTimeout(function() {
+    iina.console.log('[IPTV Global] Sending init to main window');
+    iina.standaloneWindow.postMessage('init', {
+      server: CONFIG.server || '',
+      username: CONFIG.username || '',
+      password: CONFIG.password || '',
+      autoConnect: autoConnect && CONFIG.server && CONFIG.username
+    });
+  }, 300);
+}
+
+function openBrowserWindow() {
+  iina.console.log('[IPTV Global] Opening browser...');
+  openMainWindow(true); // Auto-connect if configured
+}
+
+function openConnectionWindow() {
+  iina.console.log('[IPTV Global] Opening connection window...');
+  openMainWindow(false); // Show connection form
+}
+
+// ============================================================================
+// Message Handlers (Simplified for unified main.html)
+// ============================================================================
+
+iina.standaloneWindow.onMessage('ready', function(data) {
+  iina.console.log('[IPTV Global] Window ready signal received');
+  windowReady = true;
+});
+
+iina.standaloneWindow.onMessage('save_config', function(data) {
+  if (!data) return;
+  iina.console.log('[IPTV Global] Saving config from main window');
+  CONFIG.server = data.server;
+  CONFIG.username = data.username;
+  CONFIG.password = data.password;
+  saveConfig();
+});
+
+iina.standaloneWindow.onMessage('play', function(data) {
+  if (!data) return;
+  iina.console.log('[IPTV Global] Play request: ' + data.name);
+  triggerPlayback(data.url, data.name, data.type, data.id);
+});
+
+// HTTP Proxy handler (for ATS bypass - main.html uses this for API calls)
+iina.standaloneWindow.onMessage('api_request', function(data) {
+  iina.console.log('[IPTV Global] Proxying API request');
+  // This is handled directly by main.html's fetch, but kept for compatibility
+});
+
+// ============================================================================
+// API Response Handler (for connection.html compatibility)
+// ============================================================================
+
+iina.standaloneWindow.onMessage('api_response', function(data) {
+  iina.console.log('[IPTV API] Response received');
+  
+  if (!data || !data.requestId) {
+    iina.console.error('[IPTV API] Invalid response - no requestId');
+    return;
+  }
+  
+  // Check browser pending requests first
+  var callback = browserPendingRequests[data.requestId];
+  if (callback) {
+    delete browserPendingRequests[data.requestId];
+    
+    if (!data.success) {
+      callback(new Error(data.error || 'Network error'));
+      return;
+    }
+    
+    try {
+      var parsed = JSON.parse(data.text);
+      callback(null, parsed);
+    } catch (e) {
+      callback(new Error('Invalid JSON'));
+    }
+    return;
+  }
+  
+  // Fallback to connection pending requests
+  callback = pendingRequests[data.requestId];
+  if (callback) {
+    delete pendingRequests[data.requestId];
+    
+    if (!data.success) {
+      callback(new Error(data.error || 'Network error'));
+      return;
+    }
+    
+    try {
+      var parsed = JSON.parse(data.text);
+      if (parsed.user_info && parsed.user_info.auth === 0) {
+        callback(new Error('Authentication failed'));
+        return;
+      }
+      callback(null, parsed);
+    } catch (e) {
+      callback(new Error('Invalid server response'));
+    }
   }
 });
 
-// ============================================
-// WINDOW MANAGEMENT
-// ============================================
+// ============================================================================
+// Connection Handling
+// ============================================================================
 
-async function showWindow() {
-  loadFavorites();
-  await loadHistory();
-  restoreCache();
-
-  win.loadFile('ui/connection.html');
-  win.setProperty({
-    title: 'IPTV Player v' + PLUGIN_VERSION,
-    resizable: true,
-    fullSizeContentView: false,
-    hideTitleBar: false
-  });
-  win.setFrame(420, 650);
-
-  setupMessageHandlers();
-  win.open();
-
-  setTimeout(async function() {
-    var creds = await loadCredentials();
-    win.postMessage('init', {
-      ...creds,
-      translations: i18n.dictionaries[i18n.getLocale()]
-    });
-    if (creds.rememberMe && creds.server && creds.username && creds.password) {
-      win.postMessage('autoConnect', creds);
-    }
-  }, 500);
-}
-
-function showBrowserPage() {
-  win.loadFile('ui/browser.html');
+function handleConnectAction(data) {
+  if (!data) return;
   
-  setTimeout(function() {
-    messageHandlersSetup = false;
-    setupMessageHandlers();
-    
-    try {
-      win.postMessage('serverInfo', {
-        name: state.credentials ? state.credentials.server : 'IPTV',
-        version: PLUGIN_VERSION
-      });
-      win.postMessage('favorites', state.favorites);
-      loadCategories('live');
-    } catch (e) {
-      logError('Error sending initial data: ' + e.message);
-    }
-  }, 200);
-}
-
-// ============================================
-// MESSAGE HANDLERS
-// ============================================
-
-function setupMessageHandlers() {
-  if (messageHandlersSetup) {
-    if (DEBUG) log('setupMessageHandlers: Already called, skipping');
-    return;
-  }
+  CONFIG.server = data.server;
+  CONFIG.username = data.username;
+  CONFIG.password = data.password;
+  iina.console.log('[IPTV Global] Testing connection to: ' + CONFIG.server);
+  saveConfig();
   
-  if (DEBUG) log('Setting up message handlers...');
-
-  win.onMessage('ready', function() {
-    if (DEBUG) log('Page ready - Frontend initialized');
-    try {
-      win.postMessage('backendReady', { version: PLUGIN_VERSION, timestamp: Date.now(), status: 'ok' });
-    } catch (e) {}
-  });
-
-  win.onMessage('connect', function(data) { handleConnect(data); });
-  win.onMessage('autoConnect', function(data) { handleConnect(data); });
-  win.onMessage('disconnect', function() { handleDisconnect(); });
-
-  win.onMessage('load', function(data) {
-    if (DEBUG) log('[load] type: ' + (data ? data.type : 'null'));
-    try {
-      win.postMessage('loadReceived', { received: true, timestamp: Date.now(), type: data ? data.type : 'unknown' });
-    } catch (e) {}
-    handleLoad(data);
-  });
-
-  win.onMessage('play', function(data) {
-    if (DEBUG) log('[play] id: ' + (data && data.id ? data.id : 'null'));
-    try {
-      win.postMessage('playReceived', { received: true, timestamp: Date.now() });
-    } catch (e) {}
-    try { handlePlay(data); } catch (e) { logError('[play] Exception: ' + e.message); }
-  });
-
-  win.onMessage('favorite', function(data) { handleFavorite(data); });
-  win.onMessage('search', function(data) { handleSearch(data); });
-  win.onMessage('getEpg', function(data) { handleGetEpg(data); });
-  win.onMessage('clearCache', function() { clearCache(); });
-  win.onMessage('loadSeriesInfo', function(data) {
-    if (DEBUG) log('[loadSeriesInfo] seriesId: ' + (data && data.seriesId ? data.seriesId : 'null'));
-    handleLoadSeriesInfo(data);
-  });
-  
-  win.onMessage('updateResumePosition', function(data) {
-    if (data && data.streamId && data.position !== undefined) {
-      updateResumePosition(data.streamId, data.position, data.duration);
-    }
-  });
-  
-  win.onMessage('getResumePosition', function(data) {
-    if (data && data.streamId) {
-      var resumeData = getResumePosition(data.streamId);
-      win.postMessage('resumePosition', { streamId: data.streamId, data: resumeData });
-    }
-  });
-  
-  win.onMessage('requestVirtualItems', function(data) {
-    if (data && data.cacheKey && data.startIndex !== undefined && data.endIndex !== undefined) {
-      var cacheEntry = state.cache.streams[data.cacheKey];
-      if (cacheEntry && cacheEntry.data) {
-        var items = cacheEntry.data.slice(data.startIndex, data.endIndex);
-        win.postMessage('virtualItems', {
-          cacheKey: data.cacheKey,
-          startIndex: data.startIndex,
-          items: items,
-          totalCount: cacheEntry.data.length
-        });
-      }
-    }
-  });
-  
-  win.onMessage('saveCache', function() { saveCache(); });
-  
-  // i18n message handlers
-  win.onMessage('i18n.getTranslations', function() {
-    try {
-      win.postMessage('i18n.translations', {
-        locale: i18n.getLocale(),
-        dictionary: i18n.dictionaries
-      });
-    } catch (e) {
-      logError('[i18n] Failed to send translations: ' + e.message);
-    }
-  });
-  
-  win.onMessage('i18n.setLocale', function(data) {
-    try {
-      if (data && data.locale) {
-        i18n.setLocale(data.locale);
-        win.postMessage('i18n.translations', {
-          locale: i18n.getLocale(),
-          dictionary: i18n.dictionaries
-        });
-      }
-    } catch (e) {
-      logError('[i18n] Failed to set locale: ' + e.message);
-    }
-  });
-  
-  if (DEBUG) log('Message handlers registered');
-  messageHandlersSetup = true;
-}
-
-// ============================================
-// CONNECTION HANDLING
-// ============================================
-
-async function handleConnect(data) {
-  var server = (data.server || '').trim();
-  if (server.indexOf('http') !== 0) server = 'http://' + server;
-
-  var creds = {
-    server: server,
-    username: (data.username || '').trim(),
-    password: (data.password || '').trim()
-  };
-
-  if (!creds.server || !creds.username || !creds.password) {
-    win.postMessage('error', 'Please fill in all fields');
-    return;
-  }
-
-  state.api = new XtreamAPI(creds);
-
-  try {
-    var result = await state.api.request('get_live_categories');
-    if (!Array.isArray(result)) throw new Error('Invalid response from server');
-
-    state.isConnected = true;
-    state.credentials = creds;
-    
-    var shouldRemember = data.rememberMe !== false;
-    await saveCredentials(creds, shouldRemember);
-    
-    clearCache();
-    search.invalidateSearchCache(null); // Invalidate all search cache on new connection
-    win.postMessage('success');
-    showBrowserPage();
-  } catch (err) {
-    logError('Connection failed: ' + err.message);
-    state.api = null;
-    win.postMessage('error', 'Connection failed: ' + err.message);
-  }
-}
-
-async function handleDisconnect(clearCreds) {
-  state.isConnected = false;
-  state.api = null;
-  state.credentials = null;
-  
-  if (clearCreds) await clearCredentials();
-  clearCache();
-  search.invalidateSearchCache(null); // Invalidate all search cache
-  
-  win.loadFile('ui/connection.html');
-  setTimeout(async function() {
-    var creds = await loadCredentials();
-    win.postMessage('init', {
-      ...creds,
-      translations: i18n.dictionaries[i18n.getLocale()]
-    });
-  }, 300);
-}
-
-// ============================================
-// CONTENT LOADING
-// ============================================
-
-async function handleLoad(data) {
-  if (DEBUG) log('[handleLoad] type: ' + (data.type || 'undefined') + ', category: ' + (data.category || 'none'));
-  
-  var type = data.type;
-  var cat = data.category;
-
-  try {
-    if (cat) {
-      await loadStreams(type, cat);
-    } else if (type === 'favorites') {
-      win.postMessage('render', Object.values(state.favorites));
-    } else if (type === 'history') {
-      win.postMessage('history', state.history);
+  apiRequest(null, null, function(err, result) {
+    if (err) {
+      iina.console.error('[IPTV Global] Connection failed: ' + err.message);
+      iina.standaloneWindow.postMessage('error', { message: 'Connection failed: ' + err.message });
     } else {
-      await loadCategories(type);
+      iina.console.log('[IPTV Global] Connection successful!');
+      iina.standaloneWindow.postMessage('success', {});
+      
+      setTimeout(function() {
+        iina.standaloneWindow.close();
+        // Open browser after successful connection
+        openBrowserWindow();
+      }, 500);
     }
-  } catch (e) {
-    logError('[handleLoad] Error: ' + e.message);
-    try {
-      if (cat) win.postMessage('render', []);
-      else if (type === 'favorites' || type === 'history') win.postMessage('render', []);
-      else win.postMessage('categories', []);
-    } catch (postErr) {}
-    try {
-      win.postMessage('error', 'Failed to load content: ' + e.message);
-    } catch (postErr) {}
-  }
+  });
 }
 
-async function handleLoadSeriesInfo(data) {
-  if (DEBUG) log('[handleLoadSeriesInfo] seriesId: ' + (data && data.seriesId ? data.seriesId : 'null'));
-  
-  if (!state.api || !data.seriesId) {
-    logError('[handleLoadSeriesInfo] API not connected or missing seriesId');
-    try { win.postMessage('error', 'Cannot load series: Not connected or missing ID'); } catch (e) {}
-    return;
-  }
 
-  try {
-    var seriesInfo = await state.api.request('get_series_info', { series_id: data.seriesId });
-    if (!seriesInfo || !seriesInfo.episodes) throw new Error('No episodes found for this series');
 
-    win.postMessage('seriesInfo', {
-      seriesId: data.seriesId,
-      name: seriesInfo.info.name || data.seriesName || 'Unknown Series',
-      cover: seriesInfo.info.cover || '',
-      plot: seriesInfo.info.plot || '',
-      rating: seriesInfo.info.rating || '',
-      genre: seriesInfo.info.genre || '',
-      seasons: seriesInfo.episodes
-    });
-  } catch (e) {
-    logError('[handleLoadSeriesInfo] Failed: ' + e.message);
-    try { win.postMessage('error', 'Failed to load series: ' + e.message); } catch (err) {}
-  }
+// ============================================================================
+// Menu Actions
+// ============================================================================
+
+function actionConfigure() {
+  openConnectionWindow();
 }
 
-async function loadCategories(type) {
-  if (DEBUG) log('[loadCategories] type: ' + type);
-  
-  try {
-    if (!state.api) { win.postMessage('categories', []); return; }
-
-    var action, cacheKey;
-    if (type === 'live') { action = 'get_live_categories'; cacheKey = 'liveCategories'; }
-    else if (type === 'vod') { action = 'get_vod_categories'; cacheKey = 'vodCategories'; }
-    else if (type === 'series') { action = 'get_series_categories'; cacheKey = 'seriesCategories'; }
-    else { logError('[loadCategories] Unknown type: ' + type); win.postMessage('categories', []); return; }
-
-    if (isCacheValid(state.cache[cacheKey])) {
-      win.postMessage('categories', state.cache[cacheKey].data);
-      backgroundCacheRefresh(type);
-      if (type === 'live') { 
-        preloadVodCategories(); 
-        preloadSeriesCategories();
-        search.preloadSearchData(['vod', 'series']); // Preload search data
-      }
-      return;
-    }
-
-    var cats = await deduplicateRequest('categories:' + type, function() {
-      return withTimeout(state.api.request(action), 10000, 'Loading ' + type + ' categories');
-    });
-
-    if (!cats || !Array.isArray(cats)) throw new Error('Invalid response from server');
-
-    state.cache[cacheKey] = { data: cats, timestamp: Date.now() };
-    saveCache();
-    win.postMessage('categories', cats);
+function actionLiveCategories() {
+  apiRequest('get_live_categories', null, function(err, data) {
+    if (err) return;
     
-    if (type === 'live') { 
-      preloadVodCategories(); 
-      preloadSeriesCategories();
-      search.preloadSearchData(['vod', 'series']); // Preload search data
+    STATE.categories.live = data;
+    iina.console.log('[IPTV] ========================================');
+    iina.console.log('[IPTV] Live Categories (' + data.length + '):');
+    iina.console.log('[IPTV] ========================================');
+    
+    for (var i = 0; i < Math.min(data.length, 50); i++) {
+      iina.console.log('[IPTV]   [' + data[i].category_id + '] ' + data[i].category_name);
     }
-  } catch (e) {
-    logError('[loadCategories] Failed: ' + e.message);
-    try { win.postMessage('categories', []); } catch (postErr) {}
-    try { win.postMessage('error', 'Failed to load ' + type + ' categories: ' + e.message); } catch (postErr) {}
-  }
-}
-
-async function loadStreams(type, catId) {
-  if (DEBUG) log('[loadStreams] type: ' + type + ', catId: ' + catId);
-  
-  try {
-    if (!state.api) { win.postMessage('render', []); return; }
-
-    var action;
-    if (type === 'live') action = 'get_live_streams';
-    else if (type === 'vod') action = 'get_vod_streams';
-    else if (type === 'series') action = 'get_series';
-    else { logError('[loadStreams] Unknown type: ' + type); win.postMessage('render', []); return; }
-
-    var cacheKey = getStreamCacheKey(type, catId);
-    if (isCacheValid(state.cache.streams[cacheKey])) {
-      var cachedData = state.cache.streams[cacheKey].data;
-      if (cachedData.length > VIRTUAL_SCROLL_THRESHOLD) {
-        win.postMessage('renderVirtual', { items: cachedData, totalCount: cachedData.length, itemHeight: VIRTUAL_ITEM_HEIGHT, threshold: VIRTUAL_SCROLL_THRESHOLD });
-      } else {
-        win.postMessage('render', cachedData);
-      }
-      return;
+    
+    if (data.length > 50) {
+      iina.console.log('[IPTV] ... and ' + (data.length - 50) + ' more');
     }
+    
+    iina.console.log('[IPTV] Use "Live Streams" to list channels in a category');
+  });
+}
 
-    var streams = await deduplicateRequest(action + ':' + catId, function() {
-      return withTimeout(state.api.request(action, { category_id: catId }), 10000, 'Loading ' + type + ' streams');
-    });
-
-    if (!streams || !Array.isArray(streams)) throw new Error('Invalid response from server');
-
-    var limitedStreams = updateCache(cacheKey, streams);
-
-    if (limitedStreams.length > VIRTUAL_SCROLL_THRESHOLD) {
-      win.postMessage('renderVirtual', { items: limitedStreams, totalCount: limitedStreams.length, itemHeight: VIRTUAL_ITEM_HEIGHT, threshold: VIRTUAL_SCROLL_THRESHOLD });
-    } else {
-      win.postMessage('render', limitedStreams);
+function actionVODCategories() {
+  apiRequest('get_vod_categories', null, function(err, data) {
+    if (err) return;
+    
+    STATE.categories.vod = data;
+    iina.console.log('[IPTV] ========================================');
+    iina.console.log('[IPTV] VOD Categories (' + data.length + '):');
+    iina.console.log('[IPTV] ========================================');
+    
+    for (var i = 0; i < Math.min(data.length, 50); i++) {
+      iina.console.log('[IPTV]   [' + data[i].category_id + '] ' + data[i].category_name);
     }
-  } catch (e) {
-    logError('[loadStreams] Failed: ' + e.message);
-    try { win.postMessage('render', []); } catch (postErr) {}
-    try { win.postMessage('error', 'Failed to load ' + type + ' streams: ' + e.message); } catch (postErr) {}
-  }
-}
-
-// ============================================
-// PLAYBACK & FAVORITES
-// ============================================
-
-async function handlePlay(data) {
-  if (!data) { logError('[handlePlay] No data provided'); return; }
-  if (!state.api) { logError('[handlePlay] No API instance'); return; }
-  if (!data.id) { logError('[handlePlay] No stream ID'); return; }
-  
-  var id = data.id, type = data.type, ext = data.ext, name = data.name, resumePosition = data.resumePosition;
-  
-  if (DEBUG) log('[handlePlay] id: ' + id + ', type: ' + type);
-  
-  if (type === 'series' && !data.directStream) {
-    try {
-      var seriesInfo = await state.api.request('get_series_info', { series_id: id });
-      if (!seriesInfo || !seriesInfo.episodes) throw new Error('No episodes found');
-      var seasons = Object.keys(seriesInfo.episodes).sort();
-      if (seasons.length === 0) throw new Error('No seasons found');
-      var firstSeason = seriesInfo.episodes[seasons[0]];
-      if (!firstSeason || firstSeason.length === 0) throw new Error('No episodes in first season');
-      var firstEpisode = firstSeason[0];
-      id = firstEpisode.id || firstEpisode.stream_id;
-      ext = firstEpisode.container_extension || ext;
-      name = firstEpisode.title || name;
-    } catch (e) { logError('[handlePlay] Series error: ' + e.message); return; }
-  }
-  
-  if (!id) { logError('[handlePlay] Empty ID after processing'); return; }
-  
-  var url;
-  try { url = state.api.getStreamUrl(id, type, ext); } catch (e) { logError('[handlePlay] URL build error: ' + e.message); return; }
-  
-  var historyItem = { id: id, name: name || 'Unknown', type: type, thumbnail: data.thumbnail || data.stream_icon || data.cover || '', container_extension: ext, rating: data.rating || '', plot: data.plot || '' };
-  if (data.series_id) historyItem.series_id = data.series_id;
-  
-  await storage.addToHistory(historyItem);
-  
-  try { iina.event.emit('iptv.play', { url: url, name: name, type: type, streamId: id, resumePosition: resumePosition, timestamp: Date.now() }); }
-  catch (e) { logError('[handlePlay] Failed to emit play: ' + e.message); }
-}
-
-function handleFavorite(data) {
-  if (!data || !data.id) return;
-  
-  var id = data.id, type = data.type || 'unknown', name = data.name || 'Unknown';
-  
-  if (state.favorites[id]) delete state.favorites[id];
-  else state.favorites[id] = { id: id, type: type, name: name, addedAt: Date.now() };
-  
-  saveFavorites();
-  win.postMessage('favorites', state.favorites);
-}
-
-// ============================================
-// SEARCH
-// ============================================
-
-async function handleSearch(data) {
-  if (!state.api) { win.postMessage('render', []); return; }
-
-  var query = (data.query || '').trim();
-  if (query.length < 2) { win.postMessage('render', []); return; }
-
-  if (state.searchDebounceTimer) clearTimeout(state.searchDebounceTimer);
-
-  state.searchDebounceTimer = setTimeout(async function() {
-    try {
-      var results = await search.performSearch(query, {
-        types: ['live', 'vod', 'series'],
-        limit: stateModule.MAX_SEARCH_RESULTS
-      });
-      win.postMessage('render', results);
-    } catch (e) {
-      logError('Search failed: ' + e.message);
-      win.postMessage('render', []);
+    
+    if (data.length > 50) {
+      iina.console.log('[IPTV] ... and ' + (data.length - 50) + ' more');
     }
-  }, 300);
+  });
 }
 
-// ============================================
-// EPG
-// ============================================
+function actionSeriesCategories() {
+  apiRequest('get_series_categories', null, function(err, data) {
+    if (err) return;
+    
+    STATE.categories.series = data;
+    iina.console.log('[IPTV] ========================================');
+    iina.console.log('[IPTV] Series Categories (' + data.length + '):');
+    iina.console.log('[IPTV] ========================================');
+    
+    for (var i = 0; i < Math.min(data.length, 50); i++) {
+      iina.console.log('[IPTV]   [' + data[i].category_id + '] ' + data[i].category_name);
+    }
+    
+    if (data.length > 50) {
+      iina.console.log('[IPTV] ... and ' + (data.length - 50) + ' more');
+    }
+  });
+}
 
-async function handleGetEpg(data) {
-  if (!state.api || !data || !data.streamId) {
-    win.postMessage('epgData', { error: 'Invalid request' });
+function actionLiveStreams() {
+  apiRequest('get_live_streams', null, function(err, data) {
+    if (err) return;
+    
+    STATE.streams.live = {};
+    var streams = Array.isArray(data) ? data : [];
+    
+    iina.console.log('[IPTV] ========================================');
+    iina.console.log('[IPTV] Live Streams (' + streams.length + '):');
+    iina.console.log('[IPTV] ========================================');
+    
+    for (var i = 0; i < Math.min(streams.length, 100); i++) {
+      var s = streams[i];
+      STATE.streams.live[s.stream_id] = s;
+      iina.console.log('[IPTV]   [' + s.stream_id + '] ' + s.name);
+    }
+    
+    if (streams.length > 100) {
+      iina.console.log('[IPTV] ... and ' + (streams.length - 100) + ' more');
+    }
+    
+    iina.console.log('[IPTV] Use "Play Stream by ID" to play a specific stream');
+  });
+}
+
+function actionVODStreams() {
+  apiRequest('get_vod_streams', null, function(err, data) {
+    if (err) return;
+    
+    STATE.streams.vod = {};
+    var streams = Array.isArray(data) ? data : [];
+    
+    iina.console.log('[IPTV] ========================================');
+    iina.console.log('[IPTV] VOD Streams (' + streams.length + '):');
+    iina.console.log('[IPTV] ========================================');
+    
+    for (var i = 0; i < Math.min(streams.length, 100); i++) {
+      var s = streams[i];
+      STATE.streams.vod[s.stream_id] = s;
+      iina.console.log('[IPTV]   [' + s.stream_id + '] ' + s.name);
+    }
+    
+    if (streams.length > 100) {
+      iina.console.log('[IPTV] ... and ' + (streams.length - 100) + ' more');
+    }
+  });
+}
+
+function actionSeriesStreams() {
+  apiRequest('get_series', null, function(err, data) {
+    if (err) return;
+    
+    STATE.streams.series = {};
+    var series = Array.isArray(data) ? data : [];
+    
+    iina.console.log('[IPTV] ========================================');
+    iina.console.log('[IPTV] Series (' + series.length + '):');
+    iina.console.log('[IPTV] ========================================');
+    
+    for (var i = 0; i < Math.min(series.length, 100); i++) {
+      var s = series[i];
+      STATE.streams.series[s.series_id] = s;
+      iina.console.log('[IPTV]   [' + s.series_id + '] ' + s.name);
+    }
+    
+    if (series.length > 100) {
+      iina.console.log('[IPTV] ... and ' + (series.length - 100) + ' more');
+    }
+  });
+}
+
+function actionSearch(query) {
+  if (!query) {
+    iina.console.log('[IPTV] Usage: Search requires a query string');
     return;
   }
-
-  try {
-    var epgData = await state.api.getEpg(data.streamId);
-    win.postMessage('epgData', { streamId: data.streamId, data: epgData });
-  } catch (e) {
-    logError('[EPG] Failed: ' + e.message);
-    win.postMessage('epgData', { streamId: data.streamId, error: e.message });
-  }
+  
+  iina.console.log('[IPTV] Searching for: ' + query);
+  iina.console.log('[IPTV] (Search not implemented in menu version)');
 }
 
-// ============================================
-// MENU REGISTRATION
-// ============================================
+function actionHelp() {
+  iina.console.log('[IPTV] ========================================');
+  iina.console.log('[IPTV] IPTV Plugin Help');
+  iina.console.log('[IPTV] ========================================');
+  iina.console.log('[IPTV] Available commands:');
+  iina.console.log('[IPTV]   Configure     - Setup credentials');
+  iina.console.log('[IPTV]   Live Cats      - List live categories');
+  iina.console.log('[IPTV]   Live Streams   - List all live streams');
+  iina.console.log('[IPTV]   VOD Cats       - List VOD categories');
+  iina.console.log('[IPTV]   VOD Streams    - List all VOD');
+  iina.console.log('[IPTV]   Series Cats    - List series categories');
+  iina.console.log('[IPTV]   Series Streams - List all series');
+  iina.console.log('[IPTV]   Play by ID     - Play stream (enter ID)');
+  iina.console.log('[IPTV] ========================================');
+}
+
+// ============================================================================
+// Menu Registration
+// ============================================================================
+
+loadConfig();
 
 try {
-  if (typeof iina.menu === 'undefined' || typeof iina.menu.item !== 'function' || typeof iina.menu.addItem !== 'function') {
-    throw new Error('Menu API not available');
+  if (typeof iina.menu !== 'undefined' && typeof iina.menu.item === 'function') {
+    // Primary action - Open Browser Window
+    iina.menu.addItem(iina.menu.item('IPTV: Open Browser', openBrowserWindow));
+    
+    // Configuration
+    iina.menu.addItem(iina.menu.item('IPTV: Configure', actionConfigure));
+    
+    // Quick access (max 5 items total)
+    iina.menu.addItem(iina.menu.item('IPTV: Live Categories', actionLiveCategories));
+    iina.menu.addItem(iina.menu.item('IPTV: VOD Categories', actionVODCategories));
+    iina.menu.addItem(iina.menu.item('IPTV: Help', actionHelp));
+    
+    iina.console.log('[IPTV Global] Menu registered (5 items)');
+  } else {
+    iina.console.error('[IPTV Global] iina.menu not available');
   }
-  var menuItem = iina.menu.item('Open IPTV', showWindow, { key: 'i', modifiers: ['cmd'] });
-  if (menuItem) {
-    iina.menu.addItem(menuItem);
-    if (DEBUG) log('Menu item registered');
-  }
-} catch (menuError) {
-  logError('Menu registration failed: ' + menuError.message);
+} catch (e) {
+  iina.console.error('[IPTV Global] Menu registration failed: ' + e.message);
 }
 
-iina.console.log('[IPTV] Plugin v' + PLUGIN_VERSION + ' ready (modular)');
+iina.console.log('[IPTV Global] Initialization complete');
