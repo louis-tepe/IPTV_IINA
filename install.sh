@@ -57,7 +57,7 @@ fi
 echo -e "${GREEN}✓ Destination directory ready${NC}"
 echo ""
 
-# Step 4: Copy dist folder contents to IINA plugins
+# Copy dist folder contents to IINA plugins
 echo -e "${YELLOW}Step 4: Copying built files to IINA plugins directory...${NC}"
 if [ -d "$PROJECT_DIR/dist" ]; then
     # Copy all files from dist/ to the plugin directory
@@ -66,15 +66,6 @@ if [ -d "$PROJECT_DIR/dist" ]; then
 else
     echo -e "${RED}Error: dist/ directory not found. Build may have failed.${NC}"
     exit 1
-fi
-
-# Copy browser.js from dist/browser/ (built by Parcel browser target)
-if [ -f "$PROJECT_DIR/dist/browser/browser.js" ]; then
-    mkdir -p "$DEST_DIR/dist/browser"
-    cp "$PROJECT_DIR/dist/browser/browser.js" "$DEST_DIR/dist/browser/"
-    echo -e "${GREEN}✓ browser.js copied${NC}"
-else
-    echo -e "${YELLOW}Warning: browser.js not found in dist/browser/${NC}"
 fi
 echo ""
 
@@ -88,22 +79,16 @@ else
 fi
 echo ""
 
-# Step 6: Copy ui/ folder and styles.css
-echo -e "${YELLOW}Step 6: Copying UI files...${NC}"
-if [ -d "$PROJECT_DIR/ui" ]; then
-  cp -R "$PROJECT_DIR/ui" "$DEST_DIR/"
-  echo -e "${GREEN}✓ ui/ folder copied${NC}"
+# Step 6: Verify Info.json is present (copied in Step 5)
+echo -e "${YELLOW}Step 6: Verifying installation components...${NC}"
+if [ -f "$DEST_DIR/Info.json" ]; then
+    echo -e "${GREEN}✓ Info.json present${NC}"
 else
-  echo -e "${YELLOW}Warning: ui/ folder not found${NC}"
+    echo -e "${RED}Error: Info.json missing in destination${NC}"
 fi
 
-if [ -f "$PROJECT_DIR/styles.css" ]; then
-  cp "$PROJECT_DIR/styles.css" "$DEST_DIR/"
-  echo -e "${GREEN}✓ styles.css copied${NC}"
-else
-  echo -e "${YELLOW}Warning: styles.css not found${NC}"
-fi
-echo ""
+# ui/ and styles.css are now part of dist/ (copied in Step 4), so no manual copy needed.
+
 
 # Step 7: Copy Preferences.xib if it exists
 echo -e "${YELLOW}Step 7: Checking for Preferences.xib...${NC}"

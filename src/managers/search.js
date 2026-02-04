@@ -6,22 +6,18 @@
 
 'use strict';
 
-var stateModule = require('../core/state');
-var helpers = require('../utils/helpers');
-
-var state = stateModule.state;
-var Logger = helpers.Logger;
-var withTimeout = helpers.withTimeout;
+const { state, MAX_SEARCH_RESULTS } = require('../core/state');
+const { Logger, withTimeout } = require('../utils/helpers');
 
 // ============================================
 // CONSTANTS
 // ============================================
 
 /** @const {number} Search cache TTL - 5 minutes */
-var SEARCH_CACHE_TTL = 5 * 60 * 1000;
+const SEARCH_CACHE_TTL = 5 * 60 * 1000;
 
 /** @const {number} Preload delay - 2 seconds */
-var PRELOAD_DELAY = 2000;
+const PRELOAD_DELAY = 2000;
 
 // ============================================
 // SEARCH CACHE
@@ -35,7 +31,7 @@ var PRELOAD_DELAY = 2000;
  */
 
 /** @type {Object.<string, SearchCacheEntry>} */
-var searchCache = {
+const searchCache = {
   live: { data: null, timestamp: 0 },
   vod: { data: null, timestamp: 0 },
   series: { data: null, timestamp: 0 }
@@ -53,7 +49,7 @@ var searchCache = {
  */
 function isCacheValid(entry) {
   if (!entry || !entry.data) return false;
-  var now = Date.now();
+  const now = Date.now();
   return (now - entry.timestamp) < SEARCH_CACHE_TTL;
 }
 
@@ -64,7 +60,7 @@ function isCacheValid(entry) {
  * @returns {string|null} API action name
  */
 function getApiAction(type) {
-  var actions = {
+  const actions = {
     live: 'get_live_streams',
     vod: 'get_vod_streams',
     series: 'get_series'
@@ -84,10 +80,8 @@ function searchInData(data, query, type) {
   if (!Array.isArray(data)) return [];
   
   return data
-    .filter(function(stream) {
-      return stream.name && stream.name.toLowerCase().indexOf(query) !== -1;
-    })
-    .map(function(stream) {
+    .filter(stream => stream.name && stream.name.toLowerCase().indexOf(query) !== -1)
+    .map(stream => {
       stream.searchType = type;
       return stream;
     });
@@ -101,21 +95,21 @@ function searchInData(data, query, type) {
  * @returns {Array} Sorted results
  */
 function sortByRelevance(results, query) {
-  var lowerQuery = query.toLowerCase();
+  const lowerQuery = query.toLowerCase();
   
-  return results.sort(function(a, b) {
-    var aName = (a.name || '').toLowerCase();
-    var bName = (b.name || '').toLowerCase();
+  return results.sort((a, b) => {
+    const aName = (a.name || '').toLowerCase();
+    const bName = (b.name || '').toLowerCase();
     
     // Exact match first
-    var aExact = aName === lowerQuery;
-    var bExact = bName === lowerQuery;
+    const aExact = aName === lowerQuery;
+    const bExact = bName === lowerQuery;
     if (aExact && !bExact) return -1;
     if (!aExact && bExact) return 1;
     
     // Starts with query second
-    var aStarts = aName.indexOf(lowerQuery) === 0;
-    var bStarts = bName.indexOf(lowerQuery) === 0;
+    const aStarts = aName.indexOf(lowerQuery) === 0;
+    const bStarts = bName.indexOf(lowerQuery) === 0;
     if (aStarts && !bStarts) return -1;
     if (!aStarts && bStarts) return 1;
     
@@ -138,30 +132,30 @@ async function getCachedStreams(type) {
     throw new Error('API not connected');
   }
   
-  var cacheEntry = searchCache[type];
+  const cacheEntry = searchCache[type];
   if (!cacheEntry) {
-    throw new Error('Invalid stream type: ' + type);
+    throw new Error(`Invalid stream type: ${type}`);
   }
   
   // Return cached data if valid
   if (isCacheValid(cacheEntry)) {
-    Logger.log('[Search] Using cached ' + type + ' streams');
+    Logger.log(`[Search] Using cached ${type} streams`);
     return cacheEntry.data;
   }
   
   // Fetch from API
-  var action = getApiAction(type);
+  const action = getApiAction(type);
   if (!action) {
-    throw new Error('Unknown stream type: ' + type);
+    throw new Error(`Unknown stream type: ${type}`);
   }
   
-  Logger.log('[Search] Fetching ' + type + ' streams from API');
+  Logger.log(`[Search] Fetching ${type} streams from API`);
   
   try {
-    var streams = await withTimeout(
+    const streams = await withTimeout(
       state.api.request(action),
       10000,
-      'Loading ' + type + ' streams'
+      `Loading ${type} streams`
     );
     
     if (!Array.isArray(streams)) {
@@ -172,13 +166,13 @@ async function getCachedStreams(type) {
     cacheEntry.data = streams;
     cacheEntry.timestamp = Date.now();
     
-    Logger.log('[Search] Cached ' + type + ' streams (' + streams.length + ' items)');
+    Logger.log(`[Search] Cached ${type} streams (${streams.length} items)`);
     return streams;
   } catch (e) {
-    Logger.error('[Search] Failed to fetch ' + type + ': ' + e.message);
+    Logger.error(`[Search] Failed to fetch ${type}: ${e.message}`);
     // Return stale cache if available
     if (cacheEntry.data) {
-      Logger.log('[Search] Using stale cache for ' + type);
+      Logger.log(`[Search] Using stale cache for ${type}`);
       return cacheEntry.data;
     }
     throw e;
@@ -194,10 +188,10 @@ function invalidateSearchCache(type) {
     if (searchCache[type]) {
       searchCache[type].data = null;
       searchCache[type].timestamp = 0;
-      Logger.log('[Search] Invalidated cache for ' + type);
+      Logger.log(`[Search] Invalidated cache for ${type}`);
     }
   } else {
-    Object.keys(searchCache).forEach(function(key) {
+    Object.keys(searchCache).forEach(key => {
       searchCache[key].data = null;
       searchCache[key].timestamp = 0;
     });
@@ -218,16 +212,16 @@ function preloadSearchData(types) {
     return;
   }
   
-  Logger.log('[Search] Queueing preload for: ' + types.join(', '));
+  Logger.log(`[Search] Queueing preload for: ${types.join(', ')}`);
   
-  types.forEach(function(type) {
+  types.forEach(type => {
     if (state.preloadingQueue.indexOf(type) === -1) {
       state.preloadingQueue.push(type);
     }
   });
   
   // Process queue with delay
-  setTimeout(function() {
+  setTimeout(() => {
     processPreloadQueue();
   }, PRELOAD_DELAY);
 }
@@ -244,7 +238,7 @@ async function processPreloadQueue() {
   state.isPreloading = true;
   
   while (state.preloadingQueue.length > 0) {
-    var type = state.preloadingQueue.shift();
+    const type = state.preloadingQueue.shift();
     
     // Skip if already cached
     if (isCacheValid(searchCache[type])) {
@@ -254,7 +248,7 @@ async function processPreloadQueue() {
     try {
       await getCachedStreams(type);
     } catch (e) {
-      Logger.error('[Search] Preload failed for ' + type + ': ' + e.message);
+      Logger.error(`[Search] Preload failed for ${type}: ${e.message}`);
     }
   }
   
@@ -274,26 +268,26 @@ async function performSearch(query, options) {
     return [];
   }
   
-  var trimmedQuery = query.toLowerCase().trim();
+  const trimmedQuery = query.toLowerCase().trim();
   if (trimmedQuery.length < 2) {
     return [];
   }
   
-  var opts = options || {};
-  var types = opts.types || ['live', 'vod', 'series'];
-  var limit = opts.limit || stateModule.MAX_SEARCH_RESULTS;
+  const opts = options || {};
+  const types = opts.types || ['live', 'vod', 'series'];
+  const limit = opts.limit || MAX_SEARCH_RESULTS;
   
-  Logger.log('[Search] Searching for: "' + trimmedQuery + '" in ' + types.join(', '));
+  Logger.log(`[Search] Searching for: "${trimmedQuery}" in ${types.join(', ')}`);
   
-  var allResults = [];
+  let allResults = [];
   
   // Fetch and search each type
-  for (var i = 0; i < types.length; i++) {
-    var type = types[i];
+  for (let i = 0; i < types.length; i++) {
+    const type = types[i];
     
     try {
-      var streams = await getCachedStreams(type);
-      var typeResults = searchInData(streams, trimmedQuery, type);
+      const streams = await getCachedStreams(type);
+      let typeResults = searchInData(streams, trimmedQuery, type);
       
       // Limit results per type
       if (typeResults.length > limit) {
@@ -301,17 +295,17 @@ async function performSearch(query, options) {
       }
       
       allResults = allResults.concat(typeResults);
-      Logger.log('[Search] Found ' + typeResults.length + ' ' + type + ' results');
+      Logger.log(`[Search] Found ${typeResults.length} ${type} results`);
     } catch (e) {
-      Logger.error('[Search] Failed to search ' + type + ': ' + e.message);
+      Logger.error(`[Search] Failed to search ${type}: ${e.message}`);
     }
   }
   
   // Sort by relevance and limit total results
-  var sortedResults = sortByRelevance(allResults, trimmedQuery);
-  var finalResults = sortedResults.slice(0, limit);
+  const sortedResults = sortByRelevance(allResults, trimmedQuery);
+  const finalResults = sortedResults.slice(0, limit);
   
-  Logger.log('[Search] Total results: ' + finalResults.length);
+  Logger.log(`[Search] Total results: ${finalResults.length}`);
   
   return finalResults;
 }
@@ -321,10 +315,10 @@ async function performSearch(query, options) {
  * @returns {Object} Cache stats
  */
 function getCacheStats() {
-  var stats = {};
+  const stats = {};
   
-  Object.keys(searchCache).forEach(function(type) {
-    var entry = searchCache[type];
+  Object.keys(searchCache).forEach(type => {
+    const entry = searchCache[type];
     stats[type] = {
       hasData: entry.data !== null,
       itemCount: entry.data ? entry.data.length : 0,
@@ -337,10 +331,10 @@ function getCacheStats() {
 }
 
 module.exports = {
-  SEARCH_CACHE_TTL: SEARCH_CACHE_TTL,
-  getCachedStreams: getCachedStreams,
-  invalidateSearchCache: invalidateSearchCache,
-  preloadSearchData: preloadSearchData,
-  performSearch: performSearch,
-  getCacheStats: getCacheStats
+  SEARCH_CACHE_TTL,
+  getCachedStreams,
+  invalidateSearchCache,
+  preloadSearchData,
+  performSearch,
+  getCacheStats
 };

@@ -5,13 +5,8 @@
 
 'use strict';
 
-var state = require('../core/state').state;
-var PLUGIN_VERSION = require('../core/state').PLUGIN_VERSION;
-var CACHE_TTL = require('../core/state').CACHE_TTL;
-var MAX_CACHE_ITEMS = require('../core/state').MAX_CACHE_ITEMS;
-var VIRTUAL_SCROLL_THRESHOLD = require('../core/state').VIRTUAL_SCROLL_THRESHOLD;
-var VIRTUAL_ITEM_HEIGHT = require('../core/state').VIRTUAL_ITEM_HEIGHT;
-var Logger = require('../utils/helpers').Logger;
+const { state, PLUGIN_VERSION, CACHE_TTL, MAX_CACHE_ITEMS, VIRTUAL_SCROLL_THRESHOLD, VIRTUAL_ITEM_HEIGHT } = require('../core/state');
+const { Logger } = require('../utils/helpers');
 
 /**
  * Check if cache is valid
@@ -23,13 +18,13 @@ function isCacheValid(cacheEntry) {
     Logger.log('[Cache] MISS - No cache entry or data');
     return false;
   }
-  var isValid = (Date.now() - cacheEntry.timestamp) < CACHE_TTL;
+  const isValid = (Date.now() - cacheEntry.timestamp) < CACHE_TTL;
   if (isValid) {
-    var age = Math.round((Date.now() - cacheEntry.timestamp) / 1000);
-    Logger.log('[Cache] HIT - Data valid (age: ' + age + 's)');
+    const age = Math.round((Date.now() - cacheEntry.timestamp) / 1000);
+    Logger.log(`[Cache] HIT - Data valid (age: ${age}s)`);
   } else {
-    var expired = Math.round((Date.now() - cacheEntry.timestamp) / 1000);
-    Logger.log('[Cache] MISS - Cache expired (expired: ' + expired + 's ago)');
+    const expired = Math.round((Date.now() - cacheEntry.timestamp) / 1000);
+    Logger.log(`[Cache] MISS - Cache expired (expired: ${expired}s ago)`);
   }
   return isValid;
 }
@@ -41,7 +36,7 @@ function isCacheValid(cacheEntry) {
  * @returns {string}
  */
 function getStreamCacheKey(type, categoryId) {
-  return type + ':' + categoryId;
+  return `${type}:${categoryId}`;
 }
 
 /**
@@ -53,7 +48,7 @@ function limitCacheData(data) {
   if (!Array.isArray(data)) return data;
   if (data.length <= MAX_CACHE_ITEMS) return data;
 
-  Logger.log('[Cache] Limiting data from ' + data.length + ' to ' + MAX_CACHE_ITEMS + ' items');
+  Logger.log(`[Cache] Limiting data from ${data.length} to ${MAX_CACHE_ITEMS} items`);
   return data.slice(0, MAX_CACHE_ITEMS);
 }
 
@@ -64,7 +59,7 @@ function limitCacheData(data) {
  * @returns {Array} Limited data
  */
 function updateCache(cacheKey, data) {
-  var limitedData = limitCacheData(data);
+  const limitedData = limitCacheData(data);
   state.cache.streams[cacheKey] = {
     data: limitedData,
     timestamp: Date.now()
@@ -82,12 +77,12 @@ function updateCache(cacheKey, data) {
 function deduplicateRequest(key, requestFn) {
   // If request is already in flight, return the same promise
   if (state.inFlightRequests[key]) {
-    Logger.log('[Request] Reusing in-flight request for: ' + key);
+    Logger.log(`[Request] Reusing in-flight request for: ${key}`);
     return state.inFlightRequests[key];
   }
 
   // Create new request and track it
-  var promise = requestFn().finally(function() {
+  const promise = requestFn().finally(() => {
     // Clean up after request completes
     delete state.inFlightRequests[key];
   });
@@ -111,20 +106,20 @@ function preloadVodCategories() {
   state.isPreloading = true;
 
   // Use setTimeout to not block main operations
-  setTimeout(function() {
-    state.api.request('get_vod_categories').then(function(categories) {
+  setTimeout(() => {
+    state.api.request('get_vod_categories').then((categories) => {
       if (Array.isArray(categories)) {
         state.cache.vodCategories = {
           data: categories,
           timestamp: Date.now()
         };
         saveCache();
-        Logger.log('[Preload] VOD categories preloaded: ' + categories.length + ' items');
+        Logger.log(`[Preload] VOD categories preloaded: ${categories.length} items`);
       }
-    }).catch(function(err) {
+    }).catch((err) => {
       // Silent fail - preloading is optional
-      Logger.log('[Preload] VOD preload failed (non-critical): ' + err.message);
-    }).finally(function() {
+      Logger.log(`[Preload] VOD preload failed (non-critical): ${err.message}`);
+    }).finally(() => {
       state.isPreloading = false;
     });
   }, 2000); // Delay 2s to prioritize current user action
@@ -143,19 +138,19 @@ function preloadSeriesCategories() {
   Logger.log('[Preload] Starting background preload of Series categories');
   state.isPreloading = true;
 
-  setTimeout(function() {
-    state.api.request('get_series_categories').then(function(categories) {
+  setTimeout(() => {
+    state.api.request('get_series_categories').then((categories) => {
       if (Array.isArray(categories)) {
         state.cache.seriesCategories = {
           data: categories,
           timestamp: Date.now()
         };
         saveCache();
-        Logger.log('[Preload] Series categories preloaded: ' + categories.length + ' items');
+        Logger.log(`[Preload] Series categories preloaded: ${categories.length} items`);
       }
-    }).catch(function(err) {
-      Logger.log('[Preload] Series preload failed (non-critical): ' + err.message);
-    }).finally(function() {
+    }).catch((err) => {
+      Logger.log(`[Preload] Series preload failed (non-critical): ${err.message}`);
+    }).finally(() => {
       state.isPreloading = false;
     });
   }, 4000); // Delay 4s to spread out background requests
@@ -168,7 +163,7 @@ function preloadSeriesCategories() {
 function backgroundCacheRefresh(type) {
   if (!state.api) return;
 
-  var cacheKey, action;
+  let cacheKey, action;
   if (type === 'live') {
     cacheKey = 'liveCategories';
     action = 'get_live_categories';
@@ -183,30 +178,30 @@ function backgroundCacheRefresh(type) {
   }
 
   // Check if cache exists but might be stale soon (refresh when > 50% of TTL elapsed)
-  var cacheEntry = state.cache[cacheKey];
+  const cacheEntry = state.cache[cacheKey];
   if (cacheEntry && cacheEntry.data) {
-    var age = Date.now() - cacheEntry.timestamp;
-    var refreshThreshold = CACHE_TTL * 0.5; // Refresh at 50% of TTL
+    const age = Date.now() - cacheEntry.timestamp;
+    const refreshThreshold = CACHE_TTL * 0.5; // Refresh at 50% of TTL
 
     if (age > refreshThreshold && age < CACHE_TTL) {
-      Logger.log('[Cache] Background refreshing ' + type + ' categories');
+      Logger.log(`[Cache] Background refreshing ${type} categories`);
 
       // Use deduplication to prevent multiple refresh requests
-      var refreshKey = 'refresh:' + type;
-      deduplicateRequest(refreshKey, function() {
-        return state.api.request(action).then(function(data) {
+      const refreshKey = `refresh:${type}`;
+      deduplicateRequest(refreshKey, () => {
+        return state.api.request(action).then((data) => {
           if (Array.isArray(data)) {
             state.cache[cacheKey] = {
               data: data,
               timestamp: Date.now()
             };
             saveCache();
-            Logger.log('[Cache] Background refresh complete for ' + type);
+            Logger.log(`[Cache] Background refresh complete for ${type}`);
           }
           return data;
         });
-      }).catch(function(err) {
-        Logger.log('[Cache] Background refresh failed (non-critical): ' + err.message);
+      }).catch((err) => {
+        Logger.log(`[Cache] Background refresh failed (non-critical): ${err.message}`);
       });
     }
   }
@@ -218,7 +213,7 @@ function backgroundCacheRefresh(type) {
 function saveCache() {
   try {
     // Create a trimmed version of cache for persistence
-    var cacheToSave = {
+    const cacheToSave = {
       liveCategories: state.cache.liveCategories,
       vodCategories: state.cache.vodCategories,
       seriesCategories: state.cache.seriesCategories,
@@ -228,18 +223,18 @@ function saveCache() {
     };
 
     // Only save stream cache metadata (not full data) to stay within storage limits
-    var streamCacheKeys = Object.keys(state.cache.streams);
+    let streamCacheKeys = Object.keys(state.cache.streams);
     if (streamCacheKeys.length > 10) {
       // Only persist metadata for the 10 most recently used streams
-      streamCacheKeys.sort(function(a, b) {
-        var timeA = state.cache.streams[a].timestamp || 0;
-        var timeB = state.cache.streams[b].timestamp || 0;
+      streamCacheKeys.sort((a, b) => {
+        const timeA = state.cache.streams[a].timestamp || 0;
+        const timeB = state.cache.streams[b].timestamp || 0;
         return timeB - timeA;
       });
       streamCacheKeys = streamCacheKeys.slice(0, 10);
     }
 
-    streamCacheKeys.forEach(function(key) {
+    streamCacheKeys.forEach((key) => {
       cacheToSave.streams[key] = state.cache.streams[key];
     });
 
@@ -248,7 +243,7 @@ function saveCache() {
     }
     Logger.log('[Cache] Saved to persistent storage');
   } catch (e) {
-    Logger.error('[Cache] Failed to save: ' + e.message);
+    Logger.error(`[Cache] Failed to save: ${e.message}`);
   }
 }
 
@@ -259,12 +254,12 @@ function restoreCache() {
   try {
     if (typeof iina === 'undefined' || !iina.preferences) return;
     
-    var saved = iina.preferences.get('iptv_cache');
+    const saved = iina.preferences.get('iptv_cache');
     if (saved) {
-      var parsed = JSON.parse(saved);
+      const parsed = JSON.parse(saved);
 
       // Check if cache is not too old (max 24 hours)
-      var maxAge = 24 * 60 * 60 * 1000; // 24 hours
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours
       if (parsed.savedAt && (Date.now() - parsed.savedAt) < maxAge) {
         // Restore category caches
         if (parsed.liveCategories) state.cache.liveCategories = parsed.liveCategories;
@@ -273,18 +268,18 @@ function restoreCache() {
 
         // Restore stream caches
         if (parsed.streams) {
-          Object.keys(parsed.streams).forEach(function(key) {
+          Object.keys(parsed.streams).forEach((key) => {
             state.cache.streams[key] = parsed.streams[key];
           });
         }
 
-        Logger.log('[Cache] Restored from persistent storage (saved at: ' + new Date(parsed.savedAt).toLocaleString() + ')');
+        Logger.log(`[Cache] Restored from persistent storage (saved at: ${new Date(parsed.savedAt).toLocaleString()})`);
       } else {
         Logger.log('[Cache] Saved cache is too old, ignoring');
       }
     }
   } catch (e) {
-    Logger.error('[Cache] Failed to restore: ' + e.message);
+    Logger.error(`[Cache] Failed to restore: ${e.message}`);
   }
 }
 
@@ -309,19 +304,19 @@ function clearCache() {
 }
 
 module.exports = {
-  CACHE_TTL: CACHE_TTL,
-  MAX_CACHE_ITEMS: MAX_CACHE_ITEMS,
-  VIRTUAL_SCROLL_THRESHOLD: VIRTUAL_SCROLL_THRESHOLD,
-  VIRTUAL_ITEM_HEIGHT: VIRTUAL_ITEM_HEIGHT,
-  isCacheValid: isCacheValid,
-  getStreamCacheKey: getStreamCacheKey,
-  limitCacheData: limitCacheData,
-  updateCache: updateCache,
-  deduplicateRequest: deduplicateRequest,
-  preloadVodCategories: preloadVodCategories,
-  preloadSeriesCategories: preloadSeriesCategories,
-  backgroundCacheRefresh: backgroundCacheRefresh,
-  saveCache: saveCache,
-  restoreCache: restoreCache,
-  clearCache: clearCache
+  CACHE_TTL,
+  MAX_CACHE_ITEMS,
+  VIRTUAL_SCROLL_THRESHOLD,
+  VIRTUAL_ITEM_HEIGHT,
+  isCacheValid,
+  getStreamCacheKey,
+  limitCacheData,
+  updateCache,
+  deduplicateRequest,
+  preloadVodCategories,
+  preloadSeriesCategories,
+  backgroundCacheRefresh,
+  saveCache,
+  restoreCache,
+  clearCache
 };

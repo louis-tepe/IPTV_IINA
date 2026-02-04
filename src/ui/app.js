@@ -59,14 +59,17 @@ const elements = {};
  */
 function playEpisodeSimple(streamId, ext, title, seriesId) {
   if (!streamId || !window.iina) return;
-  iina.postMessage('play', {
-    id: String(streamId).trim(),
-    type: 'series',
-    ext: ext || 'mp4',
-    name: title || 'Unknown Episode',
-    directStream: true,
-    series_id: seriesId ? String(seriesId) : null,
-    timestamp: Date.now()
+  iina.postMessage({
+    action: 'play',
+    data: {
+      id: String(streamId).trim(),
+      type: 'series',
+      ext: ext || 'mp4',
+      name: title || 'Unknown Episode',
+      directStream: true,
+      series_id: seriesId ? String(seriesId) : null,
+      timestamp: Date.now()
+    }
   });
 }
 
@@ -881,7 +884,12 @@ function sendMessage(action, data) {
   
   if (window.iina && iina.postMessage) {
     try {
-      iina.postMessage(action, data);
+      // Standalone Window API expects a single message object
+      // We wrap the action and data into a unified structure
+      iina.postMessage({
+        action: action,
+        data: data || {}
+      });
       return true;
     } catch (err) {
       debug(`✗ SEND FAILED: ${err.message}`, 'error');

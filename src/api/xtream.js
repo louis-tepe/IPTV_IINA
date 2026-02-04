@@ -5,174 +5,155 @@
 
 'use strict';
 
-var REQUEST_TIMEOUT = require('../core/state').REQUEST_TIMEOUT;
-var Logger = require('../utils/helpers').Logger;
+const { REQUEST_TIMEOUT } = require('../core/state');
+const { Logger } = require('../utils/helpers');
 
 /**
  * Xtream Codes API Client
- * @constructor
- * @param {Object} creds - Credentials object
- * @param {string} creds.server - Server URL
- * @param {string} creds.username - Username
- * @param {string} creds.password - Password
  */
-function XtreamAPI(creds) {
-  this.server = creds.server.replace(/\/$/, '');
-  this.username = creds.username;
-  this.password = creds.password;
-  this.activeRequest = null;
-}
-
-/**
- * Make an API request with retry logic
- * @param {string} action - API action
- * @param {Object} [params] - Query parameters
- * @param {number} [retries=2] - Number of retries
- * @returns {Promise<any>}
- */
-XtreamAPI.prototype.request = function(action, params, retries) {
-  retries = retries || 2;
-  var self = this;
-
-  // Cancel previous request
-  if (this.activeRequest) {
-    Logger.log('Cancelling previous request');
-    this.activeRequest.cancelled = true;
+class XtreamAPI {
+  /**
+   * @param {Object} creds - Credentials object
+   * @param {string} creds.server - Server URL
+   * @param {string} creds.username - Username
+   * @param {string} creds.password - Password
+   */
+  constructor(creds) {
+    this.server = creds.server.replace(/\/$/, '');
+    this.username = creds.username;
+    this.password = creds.password;
+    this.activeRequest = null;
   }
 
-  var url = this.server + '/player_api.php?username=' + this.username + '&password=' + this.password;
-  if (action) url += '&action=' + action;
-  if (params) {
-    for (var k in params) {
-      url += '&' + k + '=' + encodeURIComponent(params[k]);
+  /**
+   * Make an API request with retry logic
+   * @param {string} action - API action
+   * @param {Object} [params] - Query parameters
+   * @param {number} [retries=2] - Number of retries
+   * @returns {Promise<any>}
+   */
+  async request(action, params, retries = 2) {
+    // Cancel previous request
+    if (this.activeRequest) {
+      Logger.log('Cancelling previous request');
+      this.activeRequest.cancelled = true;
     }
-  }
 
-  var requestId = Date.now();
-  this.activeRequest = { id: requestId, cancelled: false };
-  var currentRequest = this.activeRequest;
+    let url = `${this.server}/player_api.php?username=${this.username}&password=${this.password}`;
+    if (action) url += `&action=${action}`;
+    if (params) {
+      for (const k in params) {
+        url += `&${k}=${encodeURIComponent(params[k])}`;
+      }
+    }
 
-  return new Promise(function(resolve, reject) {
-    var attempt = 0;
+    const requestId = Date.now();
+    this.activeRequest = { id: requestId, cancelled: false };
+    const currentRequest = this.activeRequest;
 
-    function tryRequest() {
+    let attempt = 0;
+
+    // Retry loop using async/await
+    while (attempt <= retries) {
       attempt++;
-      Logger.log('API Request: ' + action + (attempt > 1 ? ' (retry ' + (attempt - 1) + ')' : ''));
+      Logger.log(`API Request: ${action}${attempt > 1 ? ` (retry ${attempt - 1})` : ''}`);
 
-      // Check if iina.http is available
       if (typeof iina === 'undefined' || !iina.http || typeof iina.http.get !== 'function') {
         Logger.error('iina.http.get is not available in this IINA version');
-        reject(new Error('iina.http API not available - IINA version may be too old'));
-        return;
+        throw new Error('iina.http API not available - IINA version may be too old');
       }
 
-      // Use iina.http.get with Promise-based API (IINA 1.4.1)
-      iina.http.get(url, { timeout: REQUEST_TIMEOUT })
-        .then(function(res) {
-          if (currentRequest.cancelled) return;
+      try {
+        if (currentRequest.cancelled) return;
 
-          self.activeRequest = null;
+        const res = await iina.http.get(url, { timeout: REQUEST_TIMEOUT });
 
-          var text = res.text || res.data || (typeof res === 'string' ? res : null);
-          if (!text) {
-            if (attempt <= retries) {
-              Logger.log('Empty response, retrying... (' + attempt + '/' + retries + ')');
-              setTimeout(tryRequest, 1000 * attempt);
-            } else {
-              reject(new Error('Empty response from server'));
-            }
-            return;
-          }
+        if (currentRequest.cancelled) return;
+        this.activeRequest = null;
 
-          try {
-            var data = typeof text === 'string' ? JSON.parse(text) : text;
-            var sizeKB = typeof text === 'string' ? Math.round(text.length / 1024) : 0;
-            Logger.log('Response: ' + (Array.isArray(data) ? data.length + ' items' : 'object') +
-                ' (' + sizeKB + ' KB)');
-            resolve(data);
-          } catch (e) {
-            Logger.error('JSON Parse Error: ' + e.message);
-            if (attempt <= retries) {
-              Logger.log('Parse error, retrying... (' + attempt + '/' + retries + ')');
-              setTimeout(tryRequest, 1000 * attempt);
-            } else {
-              reject(new Error('Invalid JSON response'));
-            }
-          }
-        })
-        .catch(function(err) {
-          if (currentRequest.cancelled) return;
+        const text = res.text || res.data || (typeof res === 'string' ? res : null);
+        if (!text) {
+          throw new Error('Empty response from server');
+        }
 
-          self.activeRequest = null;
+        const data = typeof text === 'string' ? JSON.parse(text) : text;
+        const sizeKB = typeof text === 'string' ? Math.round(text.length / 1024) : 0;
+        
+        Logger.log(`Response: ${Array.isArray(data) ? data.length + ' items' : 'object'} (${sizeKB} KB)`);
+        return data;
 
-          Logger.error('HTTP Error: ' + (err.message || err));
-          if (attempt <= retries) {
-            Logger.log('Request failed, retrying... (' + attempt + '/' + retries + ')');
-            setTimeout(tryRequest, 1000 * attempt);
-          } else {
-            reject(new Error('Network error after ' + retries + ' retries: ' + (err.message || err)));
-          }
-        });
+      } catch (e) {
+        if (currentRequest.cancelled) return;
+
+        const isLastAttempt = attempt > retries;
+        const errorMsg = e.message || e;
+        Logger.error(`Request failed: ${errorMsg}`);
+
+        if (isLastAttempt) {
+           this.activeRequest = null;
+           throw new Error(`Network error after ${retries} retries: ${errorMsg}`);
+        }
+
+        // Wait before retry (exponential backoff-ish: 1s, 2s, 3s...)
+        Logger.log(`Retrying in ${attempt}s...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
     }
-
-    tryRequest();
-  });
-};
-
-/**
- * Get stream URL
- * @param {string} id - Stream ID
- * @param {string} type - Stream type (live, vod, series)
- * @param {string} [ext] - File extension
- * @returns {string}
- */
-XtreamAPI.prototype.getStreamUrl = function(id, type, ext) {
-  ext = ext || 'ts';
-  Logger.log('getStreamUrl: Building URL with id=' + id + ', type=' + type + ', ext=' + ext);
-  Logger.log('getStreamUrl: API credentials - server=' + this.server + ', username=' + this.username);
-
-  var finalUrl;
-
-  // Pour les épisodes de séries, utiliser le format spécifique
-  if (type === 'series') {
-    finalUrl = this.getSeriesEpisodeUrl(id, ext);
-  } else {
-    // Format standard pour live et vod
-    var baseUrl = this.server + '/' + type + '/' + this.username + '/' + this.password + '/' + id;
-    finalUrl = baseUrl + '.' + ext;
   }
 
-  Logger.log('getStreamUrl: Final URL = ' + finalUrl);
-  return finalUrl;
-};
+  /**
+   * Get stream URL
+   * @param {string} id - Stream ID
+   * @param {string} type - Stream type (live, vod, series)
+   * @param {string} [ext] - File extension
+   * @returns {string}
+   */
+  getStreamUrl(id, type, ext = 'ts') {
+    Logger.log(`getStreamUrl: Building URL with id=${id}, type=${type}, ext=${ext}`);
+    Logger.log(`getStreamUrl: API credentials - server=${this.server}, username=${this.username}`);
 
-/**
- * Get series episode stream URL
- * Format Xtream Codes API pour les épisodes: /series/username/password/{episode_id}.{ext}
- * @param {string} episodeId - Episode ID
- * @param {string} [ext] - File extension (mp4, mkv, etc.)
- * @returns {string}
- */
-XtreamAPI.prototype.getSeriesEpisodeUrl = function(episodeId, ext) {
-  ext = ext || 'mp4';
-  Logger.log('getSeriesEpisodeUrl: Building URL for episode=' + episodeId + ', ext=' + ext);
+    let finalUrl;
 
-  // Format standard Xtream Codes pour les épisodes de séries
-  var finalUrl = this.server + '/series/' + this.username + '/' + this.password + '/' + episodeId + '.' + ext;
+    // Pour les épisodes de séries, utiliser le format spécifique
+    if (type === 'series') {
+      finalUrl = this.getSeriesEpisodeUrl(id, ext);
+    } else {
+      // Format standard pour live et vod
+      const baseUrl = `${this.server}/${type}/${this.username}/${this.password}/${id}`;
+      finalUrl = `${baseUrl}.${ext}`;
+    }
 
-  Logger.log('getSeriesEpisodeUrl: URL = ' + finalUrl);
-  return finalUrl;
-};
+    Logger.log(`getStreamUrl: Final URL = ${finalUrl}`);
+    return finalUrl;
+  }
 
-/**
- * Get EPG for a stream
- * @param {string} streamId - Stream ID
- * @returns {Promise<any>}
- */
-XtreamAPI.prototype.getEpg = function(streamId) {
-  return this.request('get_short_epg', { stream_id: streamId });
-};
+  /**
+   * Get series episode stream URL
+   * Format Xtream Codes API pour les épisodes: /series/username/password/{episode_id}.{ext}
+   * @param {string} episodeId - Episode ID
+   * @param {string} [ext] - File extension (mp4, mkv, etc.)
+   * @returns {string}
+   */
+  getSeriesEpisodeUrl(episodeId, ext = 'mp4') {
+    Logger.log(`getSeriesEpisodeUrl: Building URL for episode=${episodeId}, ext=${ext}`);
+
+    // Format standard Xtream Codes pour les épisodes de séries
+    const finalUrl = `${this.server}/series/${this.username}/${this.password}/${episodeId}.${ext}`;
+
+    Logger.log(`getSeriesEpisodeUrl: URL = ${finalUrl}`);
+    return finalUrl;
+  }
+
+  /**
+   * Get EPG for a stream
+   * @param {string} streamId - Stream ID
+   * @returns {Promise<any>}
+   */
+  getEpg(streamId) {
+    return this.request('get_short_epg', { stream_id: streamId });
+  }
+}
 
 module.exports = {
-  XtreamAPI: XtreamAPI
+  XtreamAPI
 };

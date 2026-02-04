@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IPTV Browser</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="browser-body">
+    <header class="browser-header">
+      <div class="search-container">
+        <svg
+          class="search-icon"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input
+          type="text"
+          id="search-input"
+          class="search-input"
+          data-i18n-placeholder="browser.searchPlaceholder"
+          aria-label="Search"
+        />
+        <button
+          id="search-clear"
+          class="search-clear"
+          hidden
+          aria-label="Clear search"
+        >
+          ×
+        </button>
+      </div>
+      <button
+        id="refresh-btn"
+        class="btn-icon"
+        data-i18n-title="browser.refresh"
+        aria-label="Refresh"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <polyline points="23 4 23 10 17 10" />
+          <polyline points="1 20 1 14 7 14" />
+          <path
+            d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+          />
+        </svg>
+      </button>
+      <div class="language-selector">
+        <button class="lang-btn" data-lang="fr" aria-label="Switch to French">
+          FR
+        </button>
+        <button class="lang-btn" data-lang="en" aria-label="Switch to English">
+          EN
+        </button>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button
+        class="tab active"
+        data-type="live"
+        role="tab"
+        aria-selected="true"
+        data-i18n="nav.live"
+      ></button>
+      <button
+        class="tab"
+        data-type="vod"
+        role="tab"
+        aria-selected="false"
+        data-i18n="nav.vod"
+      ></button>
+      <button
+        class="tab"
+        data-type="series"
+        role="tab"
+        aria-selected="false"
+        data-i18n="nav.series"
+      ></button>
+      <button
+        class="tab"
+        data-type="favorites"
+        role="tab"
+        aria-selected="false"
+        data-i18n="nav.favorites"
+      ></button>
+      <button
+        class="tab"
+        data-type="history"
+        role="tab"
+        aria-selected="false"
+        data-i18n="nav.history"
+      ></button>
+    </nav>
+
+    <div id="breadcrumb" class="breadcrumb" hidden>
+      <button
+        id="back-btn"
+        class="btn-back"
+        data-i18n="nav.back"
+        aria-label="Go back"
+      ></button>
+      <span id="breadcrumb-title" class="breadcrumb-title"></span>
+    </div>
+
+    <main class="browser-content">
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p data-i18n="nav.loading"></p>
+      </div>
+      <div id="empty" class="empty" hidden>
+        <p id="empty-message" data-i18n="nav.noContent"></p>
+      </div>
+      <div id="list" class="content-grid"></div>
+    </main>
+
+    <footer class="browser-footer">
+      <span id="server-name"></span>
+      <span id="item-count"></span>
+    </footer>
+
+    <!-- Debug Panel (hidden by default - press 'D' to toggle) -->
+    <div id="debug-panel" class="debug-panel" hidden>
+      <div class="debug-header">
+        <span class="debug-title" data-i18n="browser.debugConsole"
+          >Debug Console</span
+        >
+        <div class="debug-controls">
+          <span id="debug-msg-count" class="debug-stat"
+            ><span data-i18n="browser.msgs">Msgs</span>: 0</span
+          >
+          <span id="debug-last-msg" class="debug-stat"
+            ><span data-i18n="browser.last">Last</span>: --:--:--</span
+          >
+          <button
+            id="debug-clear"
+            class="debug-btn"
+            data-i18n-title="browser.clearLogs"
+          >
+            Clear
+          </button>
+          <button
+            id="debug-toggle"
+            class="debug-btn"
+            data-i18n-title="browser.toggleMinimize"
+          >
+            ▼
+          </button>
+        </div>
+      </div>
+      <div class="debug-content">
+        <div id="connection-status" class="connection-status">
+          ● <span data-i18n="browser.connecting">Connecting</span>
+        </div>
+        <div id="debug-logs" class="debug-logs"></div>
+      </div>
+    </div>
+
+    <!-- Movie Details Modal -->
+    <div
+      id="movie-modal"
+      class="movie-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="movie-modal-title"
+      hidden
+    >
+      <div class="movie-modal">
+        <div class="movie-modal-header" id="movie-modal-header">
+          <button
+            class="movie-modal-close"
+            id="movie-modal-close"
+            aria-label="Close"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="movie-modal-content">
+          <h2 class="movie-modal-title" id="movie-modal-title"></h2>
+          <div class="movie-modal-meta" id="movie-modal-meta"></div>
+          <p class="movie-modal-synopsis" id="movie-modal-synopsis"></p>
+          <div class="movie-modal-actions">
+            <button class="movie-modal-play" id="movie-modal-play">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              <span data-i18n="series.play">Play</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Accessibility: Live Region for dynamic updates -->
+    <div
+      id="live-region"
+      class="sr-only"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

@@ -12,19 +12,25 @@
     "file-system",
     "network-request",
     "show-osd",
-    "show-alert"
+    "show-alert",
+    "video-overlay"
   ],
   "allowedDomains": ["*"],
   "minIINAVersion": "1.4.1",
-  "sidebarTab": {
-    "name": "IPTV Browser"
-  },
+
   "preferencesPage": "ui/connection.html",
   "preferenceDefaults": {
     "iptv_config": "",
     "iptv_play_request": "",
-    "iptv_open_browser": "",
+    "iptv_browser_request": "",
     "iptv_debug": false,
-    "iptv_locale": "fr"
+    "iptv_locale": "fr",
+    "iptv_server": "",
+    "iptv_username": "",
+    "iptv_password": "",
+    "iptv_remember_me": "false",
+    "iptv_history": "[]",
+    "iptv_favorites": "{}",
+    "iptv_resume_positions": "{}"
   }
 }

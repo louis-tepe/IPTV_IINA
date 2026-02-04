@@ -10,41 +10,41 @@
 // ============================================
 
 /** @const {boolean} */
-var DEBUG = false;
+let DEBUG = false;
 
 /** @const {string} */
-var LOG_PREFIX = '[IPTV]';
+const LOG_PREFIX = '[IPTV]';
 
 /** @const {string} */
-var PLUGIN_VERSION = '8.0.0';
+const PLUGIN_VERSION = '8.0.0';
 
 /** @const {number} */
-var REQUEST_TIMEOUT = 30000; // 30 seconds
+const REQUEST_TIMEOUT = 30000; // 30 seconds
 
 /** @const {number} */
-var MAX_HISTORY_ITEMS = 50;
+const MAX_HISTORY_ITEMS = 50;
 
 /** @const {number} */
-var MAX_SEARCH_RESULTS = 50;
+const MAX_SEARCH_RESULTS = 50;
 
 /** @const {number} */
-var CACHE_TTL = 600000; // 10 minutes cache
+const CACHE_TTL = 600000; // 10 minutes cache
 
 /** @const {number} */
-var MAX_CACHE_ITEMS = 1000; // Maximum items per cache entry
+const MAX_CACHE_ITEMS = 1000; // Maximum items per cache entry
 
 /** @const {number} */
-var VIRTUAL_SCROLL_THRESHOLD = 50; // Items threshold for virtual scrolling
+const VIRTUAL_SCROLL_THRESHOLD = 50; // Items threshold for virtual scrolling
 
 /** @const {number} */
-var VIRTUAL_ITEM_HEIGHT = 120; // Pixels per item
+const VIRTUAL_ITEM_HEIGHT = 120; // Pixels per item
 
 // ============================================
 // MESSAGE HANDLER STATE
 // ============================================
 
 /** @type {boolean} */
-var messageHandlersSetup = false;
+const messageHandlersSetup = false;
 
 // ============================================
 // GLOBAL PLUGIN STATE
@@ -67,7 +67,7 @@ var messageHandlersSetup = false;
  */
 
 /** @type {PluginState} */
-var state = {
+const state = {
   api: null,
   isConnected: false,
   credentials: null,
@@ -89,7 +89,7 @@ var state = {
 // Load debug preference
 try {
   if (typeof iina !== 'undefined' && iina.preferences) {
-    var debugPref = iina.preferences.get('iptv_debug');
+    const debugPref = iina.preferences.get('iptv_debug');
     if (debugPref === 'true') {
       DEBUG = true;
     }
@@ -99,16 +99,16 @@ try {
 }
 
 module.exports = {
-  DEBUG: DEBUG,
-  LOG_PREFIX: LOG_PREFIX,
-  PLUGIN_VERSION: PLUGIN_VERSION,
-  REQUEST_TIMEOUT: REQUEST_TIMEOUT,
-  MAX_HISTORY_ITEMS: MAX_HISTORY_ITEMS,
-  MAX_SEARCH_RESULTS: MAX_SEARCH_RESULTS,
-  CACHE_TTL: CACHE_TTL,
-  MAX_CACHE_ITEMS: MAX_CACHE_ITEMS,
-  VIRTUAL_SCROLL_THRESHOLD: VIRTUAL_SCROLL_THRESHOLD,
-  VIRTUAL_ITEM_HEIGHT: VIRTUAL_ITEM_HEIGHT,
-  messageHandlersSetup: messageHandlersSetup,
-  state: state
+  DEBUG,
+  LOG_PREFIX,
+  PLUGIN_VERSION,
+  REQUEST_TIMEOUT,
+  MAX_HISTORY_ITEMS,
+  MAX_SEARCH_RESULTS,
+  CACHE_TTL,
+  MAX_CACHE_ITEMS,
+  VIRTUAL_SCROLL_THRESHOLD,
+  VIRTUAL_ITEM_HEIGHT,
+  messageHandlersSetup,
+  state
 };

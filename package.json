@@ -5,29 +5,45 @@
   "main": "dist/main.js",
   "scripts": {
     "dev": "parcel watch --target main --target global --no-hmr",
-    "build": "parcel build --target main --target global",
+    "build": "parcel build --target main --target global --target ui",
     "clean": "rm -rf dist .parcel-cache",
     "install-plugin": "./install.sh"
   },
+  "alias": {
+    "path": "path-browserify"
+  },
   "targets": {
     "main": {
-      "source": "main.js",
+      "source": "src/main.js",
       "distDir": "./dist",
       "includeNodeModules": true,
       "context": "node",
-      "outputFormat": "commonjs"
+      "outputFormat": "commonjs",
+      "optimize": false
     },
     "global": {
-      "source": "global.js",
+      "source": "src/global.js",
       "distDir": "./dist",
       "includeNodeModules": true,
       "context": "node",
-      "outputFormat": "commonjs"
+      "outputFormat": "commonjs",
+      "optimize": false
+    },
+    "ui": {
+      "source": [
+        "src/ui/browser.html",
+        "src/ui/connection.html",
+        "src/ui/fullscreen-browser.html"
+      ],
+      "distDir": "./dist/ui",
+      "publicUrl": "./",
+      "context": "browser"
     }
   },
   "devDependencies": {
+    "iina-plugin-definition": "latest",
     "parcel": "^2.11.0",
-    "iina-plugin-definition": "latest"
+    "path-browserify": "^1.0.1"
   },
   "keywords": [
     "iina",
