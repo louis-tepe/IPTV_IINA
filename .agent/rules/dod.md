@@ -1,52 +1,28 @@
-# Definition of Done (DoD) v8.0.0
+# Definition of Done (DoD)
 
 ## Code Quality
 
-- [ ] Code is modular (logic in `src/`, not monolithic `global.js`).
-- [ ] No `console.log` spam (use `Logger` from `src/utils/helpers.js`).
-- [ ] No duplicated code (centralized Logger, no redundant functions).
-- [ ] Error handling active for all network/file operations.
-- [ ] No syntax errors (Lint with standard JS rules).
-- [ ] No dead code (commented functions removed).
-- [ ] Constants centralized in `src/core/state.js`.
+- [ ] **Monolithic Integrity**: `global.js` must be self-contained. No missing dependencies that are only in `src/`.
+- [ ] **Syntax Check**: perform a manual verify of `global.js` (e.g. paste into a validator or check for red squiggles) since there is no build step.
+- [ ] **Error Handling**: `XtreamAPI` requests must handle timeouts and 4xx/5xx errors gracefully without crashing the plugin.
 
 ## User Experience
 
-- [ ] UI is responsive and adapts to window resizing.
-- [ ] "Native-like" feel (Dark mode support, system fonts).
-- [ ] Loading states displayed during network requests.
-- [ ] Error messages are user-friendly (not raw stack traces).
-- [ ] Internationalization support (FR/EN) with language selector.
-- [ ] Accessibility: ARIA attributes, keyboard navigation.
-- [ ] CSS optimized (no unused styles, < 700 lines).
+- [ ] **Startup Speed**: Plugin should initialize without blocking the main thread (less than 1s).
+- [ ] **Feedback**: UI must show a "Loading..." state for any network request > 200ms.
+- [ ] **Persistence**:
+  - Login credentials must survive IINA restart.
+  - Last played channel/series must be resumable.
 
-## API & Performance
+## Versioning & Release
 
-- [ ] Use `iina.http` instead of external commands (curl).
-- [ ] No unnecessary complexity (batching, over-engineering).
-- [ ] Virtual scrolling for large lists (>50 items).
-- [ ] Request deduplication to prevent duplicate API calls.
-- [ ] Cache with TTL for performance optimization.
+- [ ] **Version Match**: `Info.json` version == `global.js` `PLUGIN_VERSION`.
+- [ ] **Clean Package**: `src/` and `.git` folders are NOT included in the final distribution zip.
 
 ## Verification
 
-- [ ] Feature tested in IINA Standalone Window.
-- [ ] Feature tested during playback (if applicable).
-- [ ] Restart IINA to verify persistence.
-- [ ] Clean log output in IINA Developer Console.
-- [ ] Build successful: `npm run build` produces `dist/main.js` and `dist/global.js`.
-- [ ] Bundle sizes reasonable (main.js < 10 kB, global.js < 50 kB).
-
-## Documentation
-
-- [ ] `Info.json` version bumped if releasing.
-- [ ] `package.json` version bumped to match.
-- [ ] `CHANGELOG.md` updated with detailed changes.
-- [ ] All modules documented with JSDoc comments.
-
-## Build System
-
-- [ ] Parcel configuration correct (`.parcelrc`).
-- [ ] Entry points in `Info.json` point to `dist/` directory.
-- [ ] `package.json` targets configured for CommonJS output.
-- [ ] No wrapper files (direct bundling from source).
+- [ ] **Manual Test**: Install the modified plugin in IINA and verify:
+  1.  Login works.
+  2.  Live TV plays.
+  3.  A generic "Series" episode plays.
+  4.  Close and Re-open IINA -> Credentials are remembered.

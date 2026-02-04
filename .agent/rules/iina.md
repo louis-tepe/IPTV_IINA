@@ -4,6 +4,14 @@
 > **IINA Version**: 1.4.1  
 > **Docs**: [iina.io/plugin/documentation](https://iina.io/plugin/documentation/)
 
+> [!IMPORTANT]
+> **Project Specific Deviation**: This project (`IPTV_IINA`) does **NOT** follow the standard `dist/` vs `src/` structure described below.
+>
+> - It uses a **Monolithic** `global.js` in the root directory.
+> - The `src/` directory is for reference only and is not built.
+> - There is **NO** `package.json` or build step.
+> - Consult `architecture.md` for the actual project structure.
+
 ## 1. Critical Architecture & Constraints
 
 - **Runtime**: JavaScriptCore (Safari engine), supports **ES2015 (ES6)** on macOS 10.11+.

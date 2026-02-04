@@ -1,59 +1,32 @@
-# Development Workflow (v8.0.0)
+# Development Workflow
 
 ## Versioning
 
-- Format: `Major.Minor.Patch`.
-- Follow Semantic Versioning.
-- Update `Info.json` `version` and `ghVersion`.
-- Update `package.json` `version` to match.
-
-## Commit Strategy
-
-- **Format:** `type(scope): subject`
-- **Types:**
-  - `feat`: New feature
-  - `fix`: Bug fix
-  - `refactor`: Code change that neither fixes a bug nor adds a feature
-  - `docs`: Documentation only changes
-  - `style`: Changes that do not affect the meaning of the code
-- **Scope:** `player`, `ui`, `api`, `history`, `epg`.
+- **Double Update Required**:
+  1. Update `version` in `Info.json`.
+  2. Update `PLUGIN_VERSION` constant at the top of `global.js`.
+  - Ensure they match!
 
 ## Build Process
 
-1. **Development:**
-   ```bash
-   npm run dev  # Watch mode with auto-rebuild
-   ```
-
-2. **Production Build:**
-   ```bash
-   npm run build  # Create optimized bundles in dist/
-   ```
-
-3. **Clean:**
-   ```bash
-   npm run clean  # Remove dist/ and .parcel-cache/
-   ```
+- **No Build Step**.
+- Edit `global.js`, `main.js`, and HTML files directly in the root directory.
+- `src/` files are for reference only.
 
 ## Deployment
 
-1. Bump version in `Info.json`, `package.json`.
-2. Update `CHANGELOG.md`.
-3. Run `npm run build` to generate `dist/` bundles.
-4. Verify build output:
-   - `dist/main.js` (< 10 kB)
-   - `dist/global.js` (< 50 kB)
-5. Create `.iinaplgz` package (if manual distribution).
-6. Commit and Tag.
+1.  Bump versions (see above).
+2.  **Clean**: Remove `.DS_Store` files and `src/` folder (optional but recommended) from the distribution package.
+3.  **Pack**:
+    - Select all root files (excluding `.git`, `.agent`).
+    - Compress to `PluginName.zip`.
+    - Rename to `PluginName.iinaplg` (or `.iinaplgz` if using the CLI).
+    - OR use CLI: `npx iina-plugin pack` (if configured, likely manual currently).
 
 ## Code Review Checklist
 
-- [ ] No duplicated code (use Logger from helpers.js)
-- [ ] No dead code (commented functions removed)
-- [ ] Uses `iina.http` instead of external commands
-- [ ] Constants centralized in `src/core/state.js`
-- [ ] Proper error handling with try/catch
-- [ ] No console.log (use Logger.log/Logger.error)
-- [ ] CSS optimized (< 700 lines)
-- [ ] i18n strings use `t()` function
-- [ ] Build succeeds without errors
+- [ ] **Verification**: Did you edit `global.js` and not `src/`?
+- [ ] **Permissions**: Check `Info.json` permissions if adding new connection types.
+- [ ] **Syntax**: Manual check `global.js` for syntax errors (bracket matching) as there is no compiler to catch them.
+- [ ] **Polling**: Ensure `main.js` or `global.js` intervals are not too aggressive (<500ms).
+- [ ] **Persistence**: Verify critical data is saved to `iptv_*.json` files.
