@@ -5,263 +5,69 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>IPTV Browser</title>
   <link rel="stylesheet" href="../styles.css">
-  <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
-
-    .header {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-sm);
-      padding: var(--spacing-md);
-      background: var(--bg-secondary);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .search-container {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-sm);
-      padding: var(--spacing-sm) var(--spacing-md);
-      background: var(--bg-tertiary);
-      border-radius: var(--radius-md);
-    }
-
-    .search-icon { color: var(--text-muted); flex-shrink: 0; }
-
-    #search-input {
-      flex: 1;
-      background: transparent;
-      border: none;
-      font-size: 13px;
-    }
-
-    #search-clear {
-      font-size: 18px;
-      color: var(--text-muted);
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 0 4px;
-    }
-
-    .breadcrumb {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-sm);
-      padding: var(--spacing-sm) var(--spacing-md);
-      background: var(--bg-secondary);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .btn-back {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-xs);
-      padding: var(--spacing-xs) var(--spacing-sm);
-      font-size: 13px;
-      color: var(--accent);
-      background: var(--accent-light);
-      border: none;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-    }
-
-    .breadcrumb-title {
-      font-size: 14px;
-      font-weight: 500;
-    }
-
-    .content { flex: 1; overflow-y: auto; }
-
-    .content-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: var(--spacing-md);
-      padding: var(--spacing-md);
-    }
-
-    .stream-card {
-      display: flex;
-      flex-direction: column;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      overflow: hidden;
-      cursor: pointer;
-      transition: all var(--transition-fast);
-    }
-
-    .stream-card:hover {
-      border-color: var(--accent);
-      transform: translateY(-2px);
-    }
-
-    .stream-poster {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 16/9;
-      background: var(--bg-tertiary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .stream-poster img { width: 100%; height: 100%; object-fit: cover; }
-    .stream-poster svg { color: var(--text-muted); }
-
-    .stream-live-badge {
-      position: absolute;
-      top: var(--spacing-xs);
-      left: var(--spacing-xs);
-      padding: 2px 6px;
-      font-size: 9px;
-      font-weight: 600;
-      color: #fff;
-      background: var(--danger);
-      border-radius: var(--radius-sm);
-    }
-
-    .stream-info { padding: var(--spacing-sm); }
-
-    .stream-name {
-      font-size: 12px;
-      font-weight: 500;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-
-    .footer {
-      display: flex;
-      justify-content: space-between;
-      padding: var(--spacing-sm) var(--spacing-md);
-      font-size: 11px;
-      color: var(--text-muted);
-      background: var(--bg-secondary);
-      border-top: 1px solid var(--border);
-    }
-  </style>
 </head>
-<body>
-  <header class="header">
+<body class="browser-body">
+  <header class="browser-header">
     <div class="search-container">
-      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-      <input type="text" id="search-input" placeholder="Search...">
-      <button id="search-clear" hidden>×</button>
+      <input type="text" id="search-input" class="search-input" data-i18n-placeholder="browser.searchPlaceholder" aria-label="Search">
+      <button id="search-clear" class="search-clear" hidden aria-label="Clear search">×</button>
     </div>
-    <button id="refresh-btn" class="btn-icon" title="Refresh">
+    <button id="refresh-btn" class="btn-icon" data-i18n-title="browser.refresh" aria-label="Refresh">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
       </svg>
     </button>
+    <div class="language-selector">
+      <button class="lang-btn" data-lang="fr" aria-label="Switch to French">FR</button>
+      <button class="lang-btn" data-lang="en" aria-label="Switch to English">EN</button>
+    </div>
   </header>
 
-  <nav class="tabs">
-    <button class="tab active" data-type="live">Live TV</button>
-    <button class="tab" data-type="vod">Movies</button>
-    <button class="tab" data-type="series">Series</button>
-    <button class="tab" data-type="favorites">Favorites</button>
-    <button class="tab" data-type="history">History</button>
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-type="live" role="tab" aria-selected="true" data-i18n="nav.live"></button>
+    <button class="tab" data-type="vod" role="tab" aria-selected="false" data-i18n="nav.vod"></button>
+    <button class="tab" data-type="series" role="tab" aria-selected="false" data-i18n="nav.series"></button>
+    <button class="tab" data-type="favorites" role="tab" aria-selected="false" data-i18n="nav.favorites"></button>
+    <button class="tab" data-type="history" role="tab" aria-selected="false" data-i18n="nav.history"></button>
   </nav>
 
   <div id="breadcrumb" class="breadcrumb" hidden>
-    <button id="back-btn" class="btn-back">← Back</button>
+    <button id="back-btn" class="btn-back" data-i18n="nav.back" aria-label="Go back"></button>
     <span id="breadcrumb-title" class="breadcrumb-title"></span>
   </div>
 
-  <main class="content">
-    <div id="loading" class="loading" hidden><div class="spinner"></div><p>Loading...</p></div>
-    <div id="empty" class="empty" hidden><p id="empty-message">No content</p></div>
+  <main class="browser-content">
+    <div id="loading" class="loading" hidden><div class="spinner"></div><p data-i18n="nav.loading"></p></div>
+    <div id="empty" class="empty" hidden><p id="empty-message" data-i18n="nav.noContent"></p></div>
     <div id="list" class="content-grid"></div>
   </main>
 
-  <footer class="footer">
-    <span id="server-name">Connected</span>
+  <footer class="browser-footer">
+    <span id="server-name"></span>
     <span id="item-count"></span>
   </footer>
 
-  <script>
-    (function() {
-      var currentType = 'live';
-      var currentCategory = null;
+  <!-- Debug Panel (hidden by default - press 'D' to toggle) -->
+  <div id="debug-panel" class="debug-panel" hidden>
+    <div class="debug-header">
+      <span class="debug-title" data-i18n="browser.debugConsole">Debug Console</span>
+      <div class="debug-controls">
+        <span id="debug-msg-count" class="debug-stat"><span data-i18n="browser.msgs">Msgs</span>: 0</span>
+        <span id="debug-last-msg" class="debug-stat"><span data-i18n="browser.last">Last</span>: --:--:--</span>
+        <button id="debug-clear" class="debug-btn" data-i18n-title="browser.clearLogs">Clear</button>
+        <button id="debug-toggle" class="debug-btn" data-i18n-title="browser.toggleMinimize">▼</button>
+      </div>
+    </div>
+    <div class="debug-content">
+      <div id="connection-status" class="connection-status">● <span data-i18n="browser.connecting">Connecting</span></div>
+      <div id="debug-logs" class="debug-logs"></div>
+    </div>
+  </div>
 
-      var tabs = document.querySelectorAll('.tab');
-      var listEl = document.getElementById('list');
-      var loadingEl = document.getElementById('loading');
-      var emptyEl = document.getElementById('empty');
-      var breadcrumb = document.getElementById('breadcrumb');
-      var breadcrumbTitle = document.getElementById('breadcrumb-title');
-      var backBtn = document.getElementById('back-btn');
-
-      function showLoading() { loadingEl.hidden = false; emptyEl.hidden = true; listEl.innerHTML = ''; }
-      function hideLoading() { loadingEl.hidden = true; }
-
-      function escapeHtml(text) {
-        var div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-      }
-
-      function renderItems(items, type) {
-        hideLoading();
-        if (!items || items.length === 0) { emptyEl.hidden = false; return; }
-        emptyEl.hidden = true;
-        
-        var html = '';
-        items.forEach(function(item) {
-          var name = escapeHtml(item.name || 'Unknown');
-          var id = item.stream_id || item.series_id;
-          var ext = item.container_extension || 'ts';
-          html += '<div class="stream-card" data-id="' + id + '" data-ext="' + ext + '">' +
-            '<div class="stream-poster"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><rect x="2" y="2" width="20" height="20" rx="2"/></svg></div>' +
-            '<div class="stream-info"><div class="stream-name">' + name + '</div></div></div>';
-        });
-        listEl.innerHTML = html;
-
-        listEl.querySelectorAll('.stream-card').forEach(function(el) {
-          el.addEventListener('click', function() {
-            if (window.iina && iina.postMessage) {
-              iina.postMessage('play', { id: el.dataset.id, type: currentType, ext: el.dataset.ext });
-            }
-          });
-        });
-      }
-
-      tabs.forEach(function(tab) {
-        tab.addEventListener('click', function() {
-          tabs.forEach(function(t) { t.classList.remove('active'); });
-          tab.classList.add('active');
-          currentType = tab.dataset.type;
-          currentCategory = null;
-          breadcrumb.hidden = true;
-          showLoading();
-          if (window.iina && iina.postMessage) iina.postMessage('load', { type: currentType });
-        });
-      });
-
-      backBtn.addEventListener('click', function() {
-        currentCategory = null;
-        breadcrumb.hidden = true;
-        showLoading();
-        if (window.iina && iina.postMessage) iina.postMessage('load', { type: currentType });
-      });
-
-      if (window.iina && iina.onMessage) {
-        iina.onMessage('render', function(data) { renderItems(data, currentType); });
-        iina.onMessage('categories', function(data) { renderItems(data, currentType); });
-      }
-
-      if (window.iina && iina.postMessage) iina.postMessage('ready');
-    })();
-  </script>
+  <script src="../dist/browser/browser.js"></script>
 </body>
 </html>

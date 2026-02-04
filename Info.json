@@ -1,13 +1,13 @@
 {
   "name": "IPTV Player (Enhanced)",
   "identifier": "com.iptv.iina-plugin",
-  "version": "6.2.0",
-  "description": "IPTV Player with complete history and resume functionality: Live TV, VOD, Series, Favorites, Enhanced History with thumbnails, Resume position tracking with user prompts, Auto-reconnect with 'Remember Me', EPG, Search. FIXED: File-based persistent storage for history and resume positions (survives IINA restarts), Improved sync frequency (5s for better accuracy), Fixed history key for episodes (uses series_id to group episodes), Enhanced episode metadata parsing with better error handling.",
+  "version": "8.0.0",
+  "description": "IPTV Player v8.0.0 - Modernized Architecture: Centralized Logger, i18n (FR/EN), Simplified build (no wrappers), Native iina.http API, Streamlined EPG, Enhanced state management, CSS cleanup (53% reduction), Virtual scrolling, Lazy loading, Request deduplication, Complete Resume/History, EPG, Favorites, Search. 100% portable with iina.preferences storage.",
   "author": {
     "name": "IPTV Plugin Developer"
   },
-  "globalEntry": "global.js",
-  "entry": "main.js",
+  "globalEntry": "dist/global.js",
+  "entry": "dist/main.js",
   "permissions": [
     "network-request",
     "file-system",

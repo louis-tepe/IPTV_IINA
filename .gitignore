@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Parcel build output
+dist/
+.parcel-cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Test files
+coverage/
+.nyc_output/
+
+# Build artifacts
+*.iinaplgz
+build/
+
+# Documentation (not needed in plugin package)
+docs/
+plans/
+INSTALLATION_GUIDE.md

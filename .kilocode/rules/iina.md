@@ -136,12 +136,12 @@ iina.event.on("mpv.time-pos.changed", (v) => updateUI(v));
 
 ### `iina.http` (Networking)
 
-**Do not use `fetch`.**
+**MANDATORY: Use `iina.http` instead of external commands like `curl`.**
 
 ```javascript
 // GET
 iina.http.get("https://api.com", { timeout: 5000 }, (err, res) => {
-  if (err) return iina.console.error(err.message);
+  if (err) return Logger.error(err.message);
   const data = JSON.parse(res.text);
 });
 
@@ -155,6 +155,11 @@ iina.http.post(
   callback,
 );
 ```
+
+**Do NOT use:**
+- ❌ `iina.utils.exec('/usr/bin/curl', ...)` - Fragile and platform-dependent
+- ❌ `fetch` - Not available in plugin context
+- ❌ External HTTP libraries - Not compatible with IINA runtime
 
 ### `iina.preferences` (Storage)
 
