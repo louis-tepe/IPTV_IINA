@@ -13,7 +13,7 @@ const menu = iina.menu;
 
 function showWindow() {
     if (win) {
-        win.loadFile('browser.html');
+        win.loadFile('dist/browser.html');
         win.open();
     }
 }

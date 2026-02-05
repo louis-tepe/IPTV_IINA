@@ -4,7 +4,7 @@
  */
 
 export const LOG_PREFIX = '[IPTV]';
-export const PLUGIN_VERSION = '5.5.0-MODULAR'; // Updated version
+export const PLUGIN_VERSION = '6.2.0'; // Updated version
 export const REQUEST_TIMEOUT = 30000;
 export const MAX_HISTORY_ITEMS = 50;
 export const CACHE_TTL = 300000;

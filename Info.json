@@ -6,8 +6,8 @@
   "author": {
     "name": "IPTV Plugin Developer"
   },
-  "globalEntry": "global.js",
-  "entry": "main.js",
+  "globalEntry": "dist/global.js",
+  "entry": "dist/main.js",
   "permissions": [
     "network-request",
     "file-system",

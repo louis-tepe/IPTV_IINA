@@ -1,35 +1,58 @@
-const esbuild = require("esbuild");
-const fs = require("fs");
+import esbuild from "esbuild";
+import fs from "fs";
+import path from "path";
+
+// Ensure dist directory exists
+if (!fs.existsSync("dist")) {
+  fs.mkdirSync("dist");
+}
 
 async function build() {
   console.log("🚧 Building IINA Plugin...");
 
   try {
-    // Build global.js
+    // 1. Build global.js (Plugin Backend)
     await esbuild.build({
       entryPoints: ["src/global/index.js"],
-      outfile: "global.js",
+      outfile: "dist/global.js",
       bundle: true,
-      platform: "neutral", // IINA JS environment
+      platform: "neutral",
       target: ["es2020"],
-      format: "iife", // Global scope
-      footer: {
-        // Ensure globals are set if needed, though IIFE usually suffices.
-        // IINA global.js runs in top-level scope.
-        js: "",
-      },
+      format: "iife",
+      footer: { js: "" },
       logLevel: "info",
     });
 
-    // Build browser.js
+    // 2. Build browser.js (UI Logic)
     await esbuild.build({
       entryPoints: ["src/browser/index.js"],
-      outfile: "browser.js",
+      outfile: "dist/browser.js",
       bundle: true,
       platform: "browser",
       target: ["es2020"],
       format: "iife",
       logLevel: "info",
+    });
+
+    // 3. Build main.js (Main Window Entry)
+    await esbuild.build({
+      entryPoints: ["src/main/index.js"],
+      outfile: "dist/main.js",
+      bundle: true,
+      platform: "neutral",
+      target: ["es2020"],
+      format: "iife",
+      logLevel: "info",
+    });
+
+    // 4. Copy Static Assets
+    const staticFiles = ["browser.html", "connection.html", "styles.css"];
+    staticFiles.forEach(file => {
+      fs.copyFileSync(
+        path.join("src/static", file),
+        path.join("dist", file)
+      );
+      console.log(`COPY ${file} -> dist/${file}`);
     });
 
     console.log("✅ Build complete!");

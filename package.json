@@ -2,13 +2,13 @@
   "name": "iptv_inna",
   "version": "1.0.0",
   "description": "A powerful IPTV plugin for [IINA](https://iina.io) media player, supporting the Xtream Codes API for live TV, movies (VOD), and series.",
-  "main": "main.js",
+  "main": "dist/main.js",
   "directories": {
     "doc": "docs"
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test test/*.test.mjs"
   },
   "repository": {
     "type": "git",
@@ -17,7 +17,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/louis-tepe/IPTV_IINA/issues"
   },

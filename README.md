@@ -14,6 +14,7 @@ A powerful IPTV plugin for [IINA](https://iina.io) media player, supporting the 
 - 📜 **History** - Resume where you left off
 - 🔍 **Search** - Search across all content types
 - 🎨 **Modern UI** - Beautiful dark theme sidebar interface
+- 🔌 **Modular Architecture** - Built with ES Modules and bundled with esbuild
 
 ## Requirements
 
@@ -33,11 +34,19 @@ A powerful IPTV plugin for [IINA](https://iina.io) media player, supporting the 
 ### Method 2: Manual Installation
 
 1. Download or clone this repository
-2. Pack the plugin:
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Build the plugin:
+   ```bash
+   npm run build
+   ```
+4. Pack the plugin:
    ```bash
    /Applications/IINA.app/Contents/MacOS/iina-plugin pack .
    ```
-3. Double-click the generated `.iinaplgz` file to install
+5. Double-click the generated `.iinaplgz` file to install
 
 ## Configuration
 
@@ -65,79 +74,31 @@ Alternatively, configure directly in the sidebar when first launching.
 - **Favorites Tab** - Access your saved content
 - **History Tab** - Resume recently watched content
 
-### Playing Content
+## Development
 
-- Click any channel, movie, or episode to start playback
-- For series, click the series to see seasons and episodes
-
-### Managing Favorites
-
-- Click the ❤️ heart icon on any content to add/remove from favorites
-- Access all favorites from the **Favorites** tab
-
-## API Compatibility
-
-This plugin supports the **Xtream Codes API** format, which is the standard for most IPTV providers. The following endpoints are used:
-
-| Content Type | Endpoints Used                                           |
-| ------------ | -------------------------------------------------------- |
-| Live TV      | `get_live_categories`, `get_live_streams`                |
-| Movies       | `get_vod_categories`, `get_vod_streams`, `get_vod_info`  |
-| Series       | `get_series_categories`, `get_series`, `get_series_info` |
-
-## File Structure
+### Project Structure (Refactored)
 
 ```
 IPTV_IINA/
+├── dist/                  # Compiled output (generated)
+├── src/                   # Source code
+│   ├── browser/           # UI Logic (Browser window)
+│   ├── global/            # Plugin Backend (Node.js/IINA API)
+│   ├── main/              # Main Window Entry
+│   └── shared/            # Shared Utilities
+├── styles.css             # Stylesheet
+├── scripts/               # Build scripts
 ├── Info.json              # Plugin manifest
-├── main.js                # Entry point
-├── Preferences.xib        # Settings UI
-├── src/
-│   ├── api/
-│   │   └── xtream-api.js  # Xtream Codes API client
-│   ├── ui/
-│   │   ├── sidebar.html   # Sidebar UI
-│   │   ├── sidebar.css    # Styles
-│   │   ├── sidebar.js     # UI logic
-│   │   └── sidebar-controller.js
-│   ├── managers/
-│   │   ├── playlist-manager.js
-│   │   ├── favorites-manager.js
-│   │   └── history-manager.js
-│   └── utils/
-│       └── storage.js
-└── assets/
-    └── icon.png
+└── package.json           # Dependencies & Scripts
 ```
-
-## Troubleshooting
-
-### Connection Failed
-
-- Verify your server URL includes the port (e.g., `:8080`)
-- Check that your credentials are correct
-- Ensure your subscription is active
-
-### No Content Loading
-
-- Try clicking the refresh button
-- Check your internet connection
-- Some providers may have rate limiting
-
-### Playback Issues
-
-- Some streams may require specific codecs
-- Try a different stream to verify connectivity
-- Check IINA's console for error messages
-
-## Development
 
 ### Building
 
 ```bash
-cd IPTV_IINA
-/Applications/IINA.app/Contents/MacOS/iina-plugin pack .
+npm run build
 ```
+
+This uses `esbuild` to bundle the modular code in `src/` into the `dist/` directory (or root for legacy support).
 
 ### Debugging
 
@@ -153,8 +114,3 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 - [IINA](https://iina.io) - The modern media player for macOS
 - [Xtream Codes API](https://github.com/topics/xtream-codes-api) - API documentation
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-# IPTV_IINA
