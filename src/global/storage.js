@@ -106,3 +106,67 @@ export async function deleteCredentialsFile() {
     return false;
   }
 }
+
+// --- Favorites Storage ---
+
+const FAVORITES_FILE = 'iptv_favorites.json';
+
+function getFavoritesFilePath() {
+  const pluginDir = '/Users/tepe/Library/Application Support/com.colliderli.iina/plugins/com.iptv.iina-plugin.iinaplugin';
+  return `${pluginDir}/${FAVORITES_FILE}`;
+}
+
+export async function saveFavoritesToDisk(favorites) {
+  try {
+    if (typeof iina === 'undefined' || !iina.utils || typeof iina.utils.exec !== 'function') {
+      return false;
+    }
+
+    const jsonData = JSON.stringify(favorites);
+    const filePath = getFavoritesFilePath();
+    
+    // Escape single quotes for shell safety
+    const safeJson = jsonData.replace(/'/g, "'\"'\"'");
+    const writeCmd = `/usr/bin/printf "%s" '${safeJson}' > "${filePath}"`;
+    
+    // We assume mkdir was handled by credentials write, but safe to repeat or just rely on parent dir existing
+    // Let's just write
+    const result = await iina.utils.exec('/bin/sh', ['-c', writeCmd], null, () => {}, () => {});
+    
+    if (result && result.status === 0) {
+      log(`[Storage] Favorites saved to disk (${Object.keys(favorites).length} items)`);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    logError(`[Storage] Failed to save favorites: ${e.message}`);
+    return false;
+  }
+}
+
+export async function loadFavoritesFromDisk() {
+  try {
+    if (typeof iina === 'undefined' || !iina.utils || typeof iina.utils.exec !== 'function') return {};
+    
+    const filePath = getFavoritesFilePath();
+    const stdoutChunks = [];
+    
+    const result = await iina.utils.exec('/bin/cat', [filePath], null, 
+      (chunk) => stdoutChunks.push(chunk),
+      () => {}
+    );
+
+    if (result && result.status === 0 && stdoutChunks.length > 0) {
+      const jsonData = stdoutChunks.join('');
+      if (!jsonData || jsonData.trim() === '') return {};
+      
+      const favs = JSON.parse(jsonData);
+      log(`[Storage] Loaded ${Object.keys(favs).length} favorites from disk`);
+      return favs;
+    }
+    return {};
+  } catch (e) {
+    log('[Storage] No favorites file found or read error');
+    return {};
+  }
+}

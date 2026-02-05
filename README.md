@@ -106,6 +106,28 @@ This uses `esbuild` to bundle the modular code in `src/` into the `dist/` direct
 2. Open **Develop → IINA → your-plugin-context**
 3. Use the Web Inspector to debug JavaScript
 
+### Troubleshooting
+
+#### Plugin not appearing in menu
+
+- Check IINA Console (**Window → Console**) for errors starting with `[IPTV]`.
+- verify "iina.menu API not available" -> Update IINA.
+
+#### Common Errors
+
+- `iina.utils.exec API not available`: Update IINA.
+- `Failed to register menu item`: Reinstall plugin.
+
+### Manual Reset
+
+If you need to completely remove the plugin:
+
+```bash
+rm -rf ~/Library/Application\ Support/com.colliderli.iina/plugins/com.iptv.iina-plugin.iinaplugin*
+```
+
+Plugin files are located in: `~/Library/Application Support/com.colliderli.iina/plugins/`
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.

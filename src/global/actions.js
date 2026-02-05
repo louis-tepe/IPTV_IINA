@@ -177,13 +177,16 @@ export function handleFavorite(data) {
     const { id, type, name } = data;
     if (!id) return;
     
-    // TODO: persist favorites to storage
     if (state.favorites[id]) {
         delete state.favorites[id];
     } else {
         state.favorites[id] = { id, type, name, addedAt: Date.now() };
     }
     
-    // We should probably save to file here
+    // Persist to storage
+    import('./storage.js').then(({ saveFavoritesToDisk }) => {
+        saveFavoritesToDisk(state.favorites);
+    });
+    
     win.postMessage('favorites', state.favorites);
 }

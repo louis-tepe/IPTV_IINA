@@ -1,6 +1,6 @@
 {
   "name": "iptv_inna",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "description": "A powerful IPTV plugin for [IINA](https://iina.io) media player, supporting the Xtream Codes API for live TV, movies (VOD), and series.",
   "main": "dist/main.js",
   "directories": {

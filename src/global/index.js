@@ -1,6 +1,6 @@
 import { log, logError } from '../shared/utils.js';
 import { XtreamAPI } from './api.js';
-import { readCredentialsFromFile, writeCredentialsToFile, deleteCredentialsFile } from './storage.js';
+import { readCredentialsFromFile, writeCredentialsToFile, deleteCredentialsFile, loadFavoritesFromDisk } from './storage.js';
 import { state } from './state.js';
 import { handleLoad, handleLoadSeriesInfo, handleGetEpg, handleSearch, handleFavorite } from './actions.js';
 
@@ -112,6 +112,14 @@ function handlePlay(data) {
 // ============================================
 
 (async () => {
+    // Load favorites
+    try {
+        const favs = await loadFavoritesFromDisk();
+        state.favorites = favs || {};
+    } catch (e) {
+        logError('Failed to load favorites: ' + e.message);
+    }
+
     // Try auto-login
     const saved = await readCredentialsFromFile();
     if (saved) {
