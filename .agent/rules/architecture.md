@@ -11,10 +11,10 @@
   - Polls `iina.preferences.get('iptv_play_request')` every 500ms.
   - Handles playback resumption and position tracking.
 - **`Info.json`**: Plugin manifest. Defines permissions and entry points.
-- **`src/`**: **Reference Only**. Contains refactored code (ES modules) that is NOT currently used in the running plugin.
-  - Changes in `src/` will NOT affect the plugin unless manually ported to `global.js`.
 - **UI Files**:
   - `browser.html`, `connection.html`: Root level UI loaded by `global.js`.
+- **Scripts**:
+  - `scripts/`: Implementation and maintenance scripts.
 
 ## Data Flow (Current)
 
@@ -46,6 +46,6 @@
 ## Discrepancies & Technical Debt
 
 - **Monolith**: `global.js` is too large and mixes concerns.
-- **Dead Code**: `src/` directory is deceptive; it looks like the source but is ignored.
+
 - **Version Mismatch**: `global.js` headers may differ from `Info.json`.
 - **No Build**: Deployment requires manual zipping.
