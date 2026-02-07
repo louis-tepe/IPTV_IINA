@@ -11,13 +11,14 @@
   "permissions": [
     "network-request",
     "file-system",
-    "show-overlay",
-    "show-alert",
-    "menu",
-    "preferences",
-    "playlist",
-    "standalone-window"
+    "show-alert"
   ],
+  "preferenceDefaults": {
+    "iptv_favorites": "{}",
+    "iptv_cache": "{}",
+    "iptv_current_resume": "{}",
+    "iptv_play_request": ""
+  },
   "allowedDomains": ["*"],
   "minIINAVersion": "1.0.0"
 }

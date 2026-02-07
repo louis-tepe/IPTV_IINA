@@ -17,6 +17,11 @@ export function debug(msg, type = 'log') {
   const timestamp = new Date().toISOString().split('T')[1].slice(0, 12);
   console.log(`[IPTV Browser] ${msg}`);
   
+  // Forward to backend for visibility in IINA console
+  if (typeof iina !== 'undefined') {
+    iina.postMessage('browserLog', { msg, type, timestamp });
+  }
+  
   if (elements.debugLogs) {
     const div = document.createElement('div');
     div.className = `debug-log-entry ${type}`;

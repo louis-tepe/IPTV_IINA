@@ -38,4 +38,11 @@ describe('XtreamAPI', () => {
         const url = api.getStreamUrl(789, 'series', 'mp4');
         assert.strictEqual(url, 'http://test.com/series/user/pass/789.mp4');
     });
+
+    it('should map vod type to movie URL path', () => {
+        const creds = { server: 'http://test.com', username: 'user', password: 'pass' };
+        const api = new XtreamAPI(creds);
+        const url = api.getStreamUrl(999, 'vod', 'mkv');
+        assert.strictEqual(url, 'http://test.com/movie/user/pass/999.mkv');
+    });
 });

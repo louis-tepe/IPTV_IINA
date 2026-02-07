@@ -11,7 +11,8 @@ export const state = {
   previousView: null,
   currentRequestTimeout: null,
   debugMsgCount: 0,
-  debugMinimized: false
+  debugMinimized: false,
+  isSearching: false
 };
 
 export const elements = {};

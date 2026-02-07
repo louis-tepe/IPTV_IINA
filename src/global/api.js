@@ -133,7 +133,9 @@ export class XtreamAPI {
     if (type === 'series') {
       return this.getSeriesEpisodeUrl(id, ext);
     }
-    return `${this.server}/${type}/${this.username}/${this.password}/${id}.${ext}`;
+    // Map 'vod' to 'movie' for Xtream Codes API URL format
+    const urlPath = type === 'vod' ? 'movie' : type;
+    return `${this.server}/${urlPath}/${this.username}/${this.password}/${id}.${ext}`;
   }
 
   getSeriesEpisodeUrl(episodeId, ext = 'mp4') {

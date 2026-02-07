@@ -142,32 +142,69 @@ export async function handleGetEpg(data) {
 // Search
 export async function handleSearch(data) {
     const { query } = data;
-    if (!state.api || !query || query.length < 2) return;
+    log(`[Search] handleSearch called with query: "${query}"`);
     
-    // Clear debounce in caller usually, but here we can just execute
-    // Real-world: do all 3 requests
+    if (!state.api) {
+        log('[Search] ERROR: No API connection');
+        return;
+    }
+    if (!query || query.length < 2) {
+        log(`[Search] Query too short (min 2 chars): "${query}"`);
+        return;
+    }
+    
     try {
         const results = [];
+        
         // Live
+        log('[Search] Fetching live streams...');
         try {
            const live = await state.api.request('get_live_streams');
-           if(Array.isArray(live)) results.push(...live.filter(s => s.name.toLowerCase().includes(query.toLowerCase())).map(s => ({...s, searchType: 'live'})));
-        } catch(e) {}
+           const liveCount = Array.isArray(live) ? live.length : 0;
+           log(`[Search] Live: ${liveCount} total streams`);
+           if(Array.isArray(live)) {
+               const filtered = live.filter(s => s.name && s.name.toLowerCase().includes(query.toLowerCase()));
+               log(`[Search] Live: ${filtered.length} matches for "${query}"`);
+               results.push(...filtered.map(s => ({...s, searchType: 'live'})));
+           }
+        } catch(e) {
+            log(`[Search] Live search error: ${e.message}`);
+        }
         
         // VOD
+        log('[Search] Fetching VOD streams...');
         try {
            const vod = await state.api.request('get_vod_streams');
-           if(Array.isArray(vod)) results.push(...vod.filter(s => s.name.toLowerCase().includes(query.toLowerCase())).map(s => ({...s, searchType: 'vod'})));
-        } catch(e) {}
+           const vodCount = Array.isArray(vod) ? vod.length : 0;
+           log(`[Search] VOD: ${vodCount} total streams`);
+           if(Array.isArray(vod)) {
+               const filtered = vod.filter(s => s.name && s.name.toLowerCase().includes(query.toLowerCase()));
+               log(`[Search] VOD: ${filtered.length} matches for "${query}"`);
+               results.push(...filtered.map(s => ({...s, searchType: 'vod'})));
+           }
+        } catch(e) {
+            log(`[Search] VOD search error: ${e.message}`);
+        }
     
         // Series
+        log('[Search] Fetching series...');
         try {
            const series = await state.api.request('get_series');
-           if(Array.isArray(series)) results.push(...series.filter(s => s.name.toLowerCase().includes(query.toLowerCase())).map(s => ({...s, searchType: 'series'})));
-        } catch(e) {}
+           const seriesCount = Array.isArray(series) ? series.length : 0;
+           log(`[Search] Series: ${seriesCount} total`);
+           if(Array.isArray(series)) {
+               const filtered = series.filter(s => s.name && s.name.toLowerCase().includes(query.toLowerCase()));
+               log(`[Search] Series: ${filtered.length} matches for "${query}"`);
+               results.push(...filtered.map(s => ({...s, searchType: 'series'})));
+           }
+        } catch(e) {
+            log(`[Search] Series search error: ${e.message}`);
+        }
         
+        log(`[Search] Total results: ${results.length} (capped at 50)`);
         win.postMessage('render', results.slice(0, 50));
     } catch(e) {
+        log(`[Search] Fatal error: ${e.message}`);
         win.postMessage('render', []);
     }
 }
